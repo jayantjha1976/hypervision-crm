@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Tracking Dashboard - Admin</title>
+    <style>
+        :root {
+            /* Light Theme: Streamlined monochromatic text readability */
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #0d1322 100%);
+            --card-bg: rgba(17, 24, 39, 0.85);
+            --text-main: #ffffff; 
+            --text-muted: #9ca3af;
+            --border-color: rgba(99, 102, 241, 0.2);
+            --table-header-bg: #1f2937;
+            --table-hover-bg: #1a2234;
+            --history-item-bg: #1f2937;
+            --modal-bg: #111827;
+            --input-bg: #0b0f19;
+            --input-border: #374151;
+            
+            /* Neon Cyan & Purple Theme Colors for Tabs */
+            --tab-pipeline: #1e1b4b;    
+            --tab-pipeline-hover: #312e81;
+            --tab-pending: #31103f;     
+            --tab-pending-hover: #581c87;
+            --tab-nextday: #164e63;     
+            --tab-nextday-hover: #155e75;
+            --tab-next7days: #3b0764;   
+            --tab-next7days-hover: #581c87;
+            --tab-remaining: #065f46;   
+            --tab-remaining-hover: #047857;
+            --tab-dead: #7f1d1d;       
+            --tab-dead-hover: #991b1b;
+
+            --btn-add-bg: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            --btn-add-color: #ffffff;
+            --meta-box-bg: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            --meta-box-border: rgba(139, 92, 246, 0.3);
+            --meta-label-color: #ffffff;
+            --meta-value-color: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme: Streamlined monochromatic text readability */
+            --bg-gradient: linear-gradient(135deg, #05070b 0%, #0b0f19 50%, #030712 100%);
+            --card-bg: rgba(13, 17, 23, 0.9);
+            --text-main: #ffffff; 
+            --text-muted: #9ca3af;
+            --border-color: rgba(139, 92, 246, 0.25);
+            --table-header-bg: #161b22;
+            --table-hover-bg: #1c2128;
+            --history-item-bg: #161b22;
+            --modal-bg: #0d1117;
+            --input-bg: #05070b;
+            --input-border: #30363d;
+            
+            --tab-pipeline: #1e1b4b;    
+            --tab-pipeline-hover: #312e81;
+            --tab-pending: #31103f;     
+            --tab-pending-hover: #581c87;
+            --tab-nextday: #164e63;     
+            --tab-nextday-hover: #155e75;
+            --tab-next7days: #3b0764;   
+            --tab-next7days-hover: #581c87;
+            --tab-remaining: #065f46;   
+            --tab-remaining-hover: #047857;
+            --tab-dead: #7f1d1d;       
+            --tab-dead-hover: #991b1b;
+
+            --btn-add-bg: linear-gradient(135deg, #0891b2 0%, #7c3aed 100%);
+            --btn-add-color: #ffffff;
+            --meta-box-bg: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+            --meta-box-border: rgba(6, 182, 212, 0.3);
+            --meta-label-color: #ffffff;
+            --meta-value-color: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+
+        /* Top Center Logo Container - Zero Edge Glow */
+        .header-logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .header-logo {
+            max-height: 75px;
+            width: auto;
+            object-fit: contain;
+            mix-blend-mode: normal;
+            background-color: #000000;
+            padding: 4px 8px;
+            border-radius: 8px;
+            box-shadow: none;
+        }
+
+        [data-theme="dark"] .header-logo {
+            mix-blend-mode: screen;
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .fallback-brand {
+            display: none;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: auto;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.1);
+            border: 1px solid var(--border-color);
+            transition: all 0.4s ease;
+            overflow: hidden;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--text-main);
+            font-size: 1.25rem;
+            letter-spacing: 0.3px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px dashed var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .section-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .section-header h2 {
+            margin: 0;
+            border: none;
+            padding: 0;
+            white-space: nowrap;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .view-title-text {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            border-left: 2px solid var(--border-color);
+            padding-left: 15px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Theme & Admin Toggle Buttons */
+        .theme-toggle-btn, .admin-auth-btn {
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 2px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .theme-toggle-btn:hover, .admin-auth-btn:hover {
+            border-color: #22d3ee;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* Batch Delete Selected Button */
+        .btn-batch-delete {
+            background-color: rgba(185, 28, 28, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.4);
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            display: none; /* Shown dynamically when admin selects items */
+        }
+        .btn-batch-delete:hover {
+            background-color: rgba(185, 28, 28, 0.4);
+        }
+
+        /* Add Lead Button */
+        .btn-add-lead {
+            background: var(--btn-add-bg);
+            color: var(--btn-add-color);
+            border: none;
+            padding: 9px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-add-lead:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
+            opacity: 0.95;
+        }
+
+        /* Phone Input Group Styling */
+        .phone-input-group {
+            display: flex;
+            align-items: center;
+            background-color: var(--input-bg);
+            border: 2px solid var(--input-border);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .phone-prefix {
+            padding: 9px 12px;
+            background-color: var(--table-header-bg);
+            color: var(--text-main);
+            font-weight: 700;
+            font-size: 0.85rem;
+            border-right: 2px solid var(--input-border);
+            user-select: none;
+        }
+        .phone-input-group input[type="tel"] {
+            border: none;
+            background: transparent;
+            padding: 9px 12px;
+            outline: none;
+            width: 100%;
+            color: var(--text-main);
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+        .phone-input-group:focus-within {
+            border-color: #22d3ee;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.25);
+        }
+
+        /* Navigation Tabs with Neon/Dark Harmony Colors */
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .tab-pipeline { background-color: var(--tab-pipeline); }
+        .tab-pipeline:hover, .tab-pipeline.active { background-color: var(--tab-pipeline-hover); border-color: #8b5cf6; transform: translateY(-1px); box-shadow: 0 0 10px rgba(139, 92, 246, 0.3); }
+
+        /* Blinking Mild Red Tab for Missed Follow Up */
+        @keyframes mildBlink {
+            0% { opacity: 1; background-color: rgba(127, 29, 29, 0.6); border-color: rgba(248, 113, 113, 0.4); }
+            50% { opacity: 0.55; background-color: rgba(153, 27, 27, 0.9); border-color: rgba(248, 113, 113, 0.9); box-shadow: 0 0 12px rgba(248, 113, 113, 0.5); }
+            100% { opacity: 1; background-color: rgba(127, 29, 29, 0.6); border-color: rgba(248, 113, 113, 0.4); }
+        }
+        .tab-missed {
+            animation: mildBlink 1.8s infinite ease-in-out;
+            background-color: rgba(127, 29, 29, 0.7);
+            border-color: #f87171;
+            color: #ffffff;
+            display: none; 
+        }
+        .tab-missed:hover, .tab-missed.active {
+            background-color: rgba(153, 27, 27, 1);
+            border-color: #fca5a5;
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.6);
+        }
+
+        .tab-pending { background-color: var(--tab-pending); }
+        .tab-pending:hover, .tab-pending.active { background-color: var(--tab-pending-hover); border-color: #c084fc; transform: translateY(-1px); box-shadow: 0 0 10px rgba(192, 132, 252, 0.3); }
+
+        .tab-nextday { background-color: var(--tab-nextday); }
+        .tab-nextday:hover, .tab-nextday.active { background-color: var(--tab-nextday-hover); border-color: #22d3ee; transform: translateY(-1px); box-shadow: 0 0 10px rgba(34, 211, 238, 0.3); }
+
+        .tab-next7days { background-color: var(--tab-next7days); }
+        .tab-next7days:hover, .tab-next7days.active { background-color: var(--tab-next7days-hover); border-color: #a855f7; transform: translateY(-1px); box-shadow: 0 0 10px rgba(168, 85, 247, 0.3); }
+
+        .tab-remaining { background-color: var(--tab-remaining); }
+        .tab-remaining:hover, .tab-remaining.active { background-color: var(--tab-remaining-hover); border-color: #34d399; transform: translateY(-1px); box-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
+
+        .tab-dead { background-color: var(--tab-dead); }
+        .tab-dead:hover, .tab-dead.active { background-color: var(--tab-dead-hover); border-color: #991b1b; transform: translateY(-1px); box-shadow: 0 0 10px rgba(248, 113, 113, 0.3); }
+
+        /* Blinking Row for Missed Follow Up in Pipeline */
+        @keyframes rowMildFlash {
+            0% { background-color: rgba(127, 29, 29, 0.15); }
+            50% { background-color: rgba(185, 28, 28, 0.35); }
+            100% { background-color: rgba(127, 29, 29, 0.15); }
+        }
+        .missed-row-highlight {
+            animation: rowMildFlash 1.8s infinite ease-in-out;
+        }
+        .missed-row-highlight:hover {
+            background-color: rgba(185, 28, 28, 0.45) !important;
+        }
+
+        .tab-btn.active {
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .full-width {
+            grid-column: span 2;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input[type="text"], input[type="email"], input[type="date"], input[type="password"], select, textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 2px solid var(--input-border);
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 0.85rem;
+            background-color: var(--input-bg);
+            transition: border-color 0.3s, background-color 0.3s;
+            color: var(--text-main);
+            font-family: inherit;
+        }
+        input[type="date"] {
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.8);
+            padding: 2px;
+        }
+        [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+
+        textarea { resize: vertical; }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #22d3ee;
+            background-color: var(--card-bg);
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.25);
+        }
+        
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .chip-label { cursor: pointer; text-transform: none; letter-spacing: normal; }
+        .chip-label input[type="checkbox"] { display: none; }
+        .chip {
+            display: inline-block;
+            padding: 6px 14px;
+            background-color: var(--input-bg);
+            border: 2px solid var(--input-border);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-main); 
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .chip-label input[type="checkbox"]:checked + .chip {
+            background-color: rgba(139, 92, 246, 0.4);
+            border-color: #a855f7;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+            color: #ffffff;
+            border: none;
+            padding: 11px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 700;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+        }
+        .btn-primary:hover {
+            opacity: 0.95;
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .btn-action {
+            border: none;
+            padding: 6px 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+        .btn-edit { background-color: transparent; color: var(--text-main); border: 1px solid var(--input-border); }
+        .btn-edit:hover { background-color: rgba(255, 255, 255, 0.05); }
+        .btn-contact { background-color: transparent; color: var(--text-main); border: 1px solid var(--input-border); }
+        .btn-contact:hover { background-color: rgba(255, 255, 255, 0.05); }
+        .btn-delete { background-color: rgba(185, 28, 28, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
+        .btn-delete:hover { background-color: rgba(185, 28, 28, 0.4); }
+
+        /* Status badges and tags with light grey outlines / borders for leads only */
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 700;
+            display: inline-block;
+            letter-spacing: 0.3px;
+            color: var(--text-main); 
+            background-color: transparent;
+            border: 1px solid var(--input-border);
+        }
+
+        .table-container { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            color: var(--text-main);
+        }
+        th {
+            background-color: var(--table-header-bg);
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-radius: 6px;
+        }
+        tr:hover { background-color: var(--table-hover-bg); }
+        .empty-state { text-align: center; padding: 45px 20px; color: var(--text-muted); font-style: italic; }
+        
+        .company-tag {
+            background-color: transparent;
+            color: var(--text-main); 
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            border: 1px solid var(--input-border);
+        }
+        .product-tag {
+            background-color: transparent;
+            color: var(--text-main); 
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            display: inline-block;
+            margin: 2px;
+            border: 1px solid var(--input-border);
+        }
+        .product-cell { max-width: 190px; line-height: 1.8; }
+        
+        .comment-link {
+            color: var(--text-main); 
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+        .comment-link:hover {
+            opacity: 0.8;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; 
+            overflow: auto; background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(6px);
+        }
+        .modal-content {
+            background-color: var(--modal-bg); margin: 5% auto; padding: 30px;
+            border: 1px solid var(--border-color); border-radius: 20px; width: 90%;
+            max-width: 580px; position: relative; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(6, 182, 212, 0.15);
+            color: var(--text-main);
+        }
+        .close-btn {
+            color: var(--text-muted); float: right; font-size: 28px; font-weight: bold;
+            cursor: pointer; position: absolute; right: 22px; top: 18px; transition: color 0.2s;
+        }
+        .close-btn:hover { color: #f87171; }
+
+        .history-list {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            padding-right: 8px;
+        }
+        .history-item {
+            background: var(--history-item-bg);
+            border-left: 4px solid var(--input-border);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .disp-badge {
+            background: transparent;
+            color: var(--text-main); 
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border: 1px solid var(--input-border);
+        }
+
+        /* Rich Cyberpunk Info Box Layout */
+        .lead-meta-box {
+            background: var(--meta-box-bg);
+            padding: 18px 20px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px 20px;
+            border: 1px solid var(--meta-box-border);
+            box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+        .lead-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .lead-meta-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+        .lead-meta-value {
+            font-weight: 700;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            word-break: break-word;
+        }
+        .lead-meta-value a {
+            color: var(--text-main);
+            text-decoration: underline;
+        }
+        .lead-meta-value a:hover {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 900px) {
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+            .section-header-left {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            .view-title-text {
+                border-left: none;
+                padding-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Center Logo Container -->
+    <div class="header-logo-container">
+        <img src="Logo 3.jpg" alt="Hypervision Logo" class="header-logo" onerror="this.style.display='none'; document.getElementById('fallbackBrand').style.display='block';">
+        <div id="fallbackBrand" class="fallback-brand">HYPERVISION</div>
+    </div>
+
+    <div class="container">
+        <!-- Dashboard Display Section (Full Width) -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-header-left">
+                    <h2>Lead Management System</h2>
+                    <span id="viewTitle" class="view-title-text">Lead Directory (Pipeline)</span>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">🌙 Dark Mode</button>
+                    <button class="btn-batch-delete" id="batchDeleteBtn" onclick="batchDeleteSelected()">🗑️ Delete Selected</button>
+                    <button class="admin-auth-btn" id="adminAuthBtn" onclick="handleAdminAction()">🔒 Admin Login</button>
+                    <button class="btn-add-lead" onclick="openLeadModal()">+ Add New Lead</button>
+                </div>
+            </div>
+
+            <!-- View Navigation Tabs with Neon/Dark Harmony Colors -->
+            <div class="nav-tabs">
+                <button class="tab-btn tab-pipeline active" onclick="switchView('pipeline')">Pipeline (All)</button>
+                <button class="tab-btn tab-missed" id="missedTabBtn" onclick="switchView('missed')">🚨 Missed Follow Up</button>
+                <button class="tab-btn tab-pending" onclick="switchView('pending')">Pending Contact</button>
+                <button class="tab-btn tab-nextday" onclick="switchView('nextDay')">Next Day - FU</button>
+                <button class="tab-btn tab-next7days" onclick="switchView('next7Days')">Next 7 Days - FU</button>
+                <button class="tab-btn tab-remaining" onclick="switchView('remaining')">Remaining-FU</button>
+                <button class="tab-btn tab-dead" onclick="switchView('dead')">Dead Leads</button>
+            </div>
+
+            <div class="table-container">
+                <table id="leadTable">
+                    <thead>
+                        <tr id="tableHeaderRow">
+                            <!-- Dynamically updated based on active view -->
+                        </tr>
+                    </thead>
+                    <tbody id="leadTableBody">
+                        <!-- Javascript will inject rows here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="modal" onclick="handleOutsideClick(event, 'adminLoginModal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 400px;">
+            <span class="close-btn" onclick="closeAdminLoginModal()">&times;</span>
+            <div class="section-header" style="border-bottom: 2px dashed var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; background: none; color: var(--text-main);">Admin Authentication</h2>
+            </div>
+            <form id="adminLoginForm" onsubmit="verifyAdminPin(event)">
+                <div class="full-width" style="margin-bottom: 15px;">
+                    <label for="adminPinInput">Enter Admin PIN</label>
+                    <input type="password" id="adminPinInput" required placeholder="Enter passcode..." autocomplete="current-password">
+                </div>
+                <div class="full-width">
+                    <button type="submit" class="btn-primary">Login as Admin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Lead Modal Overlay -->
+    <div id="leadModal" class="modal" onclick="handleOutsideClick(event, 'leadModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeLeadModal()">&times;</span>
+            <div class="section-header" style="border-bottom: 2px dashed var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; background: none; color: var(--text-main);">Add New Lead</h2>
+            </div>
+            <form id="leadForm" class="form-grid">
+                <div class="full-width">
+                    <label for="name">Lead Name</label>
+                    <input type="text" id="name" required placeholder="John Doe">
+                </div>
+                <div class="full-width">
+                    <label for="company">Company</label>
+                    <input type="text" id="company" required placeholder="ABC Realtors">
+                </div>
+                <div>
+                    <label for="phone">Phone Number</label>
+                    <div class="phone-input-group">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" id="phone" required placeholder="9876543210" pattern="[0-9]{10}" maxlength="10" title="Please enter exactly 10 digits">
+                    </div>
+                </div>
+                <div>
+                    <label for="location">Location</label>
+                    <input type="text" id="location" required placeholder="Noida, UP">
+                </div>
+                <div class="full-width">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" required placeholder="contact@domain.com">
+                </div>
+
+                <div class="full-width">
+                    <label for="leadSource">Lead Source</label>
+                    <select id="leadSource" required onchange="toggleInitialDisposition()">
+                        <option value="" disabled selected>Select lead source...</option>
+                        <option value="Phone- Business">Phone- Business</option>
+                        <option value="Phone- Personal">Phone- Personal</option>
+                        <option value="WhatsApp- Business">WhatsApp- Business</option>
+                        <option value="WhatsApp- Personal">WhatsApp- Personal</option>
+                        <option value="Email">Email</option>
+                        <option value="Web Form Submit">Web Form Submit</option>
+                        <option value="Referral">Referral</option>
+                    </select>
+                </div>
+
+                <!-- Dynamic Fields for Phone/WhatsApp Sources -->
+                <div id="initialContactFields" class="full-width" style="display: none; background: var(--history-item-bg); padding: 14px; border-radius: 12px; border: 1px dashed var(--input-border);">
+                    <div style="margin-bottom: 10px;">
+                        <label for="initialDisposition">Initial Disposition</label>
+                        <select id="initialDisposition" onchange="toggleInitialDateInput()">
+                            <option value="" disabled selected>Select outcome...</option>
+                            <option value="Interested">Interested</option>
+                            <option value="Casual Query">Casual Query</option>
+                            <option value="Follow Up Later">Follow Up Later</option>
+                            <option value="No Response">No Response</option>
+                            <option value="Not Interested">Not Interested</option>
+                        </select>
+                    </div>
+                    <div id="initialDateContainer" style="display: none;">
+                        <label for="initialFollowupDate">Next Follow-up Date</label>
+                        <input type="date" id="initialFollowupDate" onclick="this.showPicker && this.showPicker()">
+                    </div>
+                </div>
+                
+                <div class="full-width">
+                    <label>Product Interest (Select Multiple)</label>
+                    <div class="chip-group">
+                        <label class="chip-label">
+                            <input type="checkbox" name="product" value="HoloBox">
+                            <span class="chip">HoloBox</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="product" value="HoloWall">
+                            <span class="chip">HoloWall</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="product" value="HoloStage">
+                            <span class="chip">HoloStage</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="product" value="AR/VR">
+                            <span class="chip">AR/VR</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="full-width">
+                    <label for="comments">Initial Interaction Log</label>
+                    <textarea id="comments" rows="3" placeholder="Add any details from your conversation..."></textarea>
+                </div>
+                <div class="full-width">
+                    <button type="submit" class="btn-primary">Save Lead</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Modal Overlay -->
+    <div id="editModal" class="modal" onclick="handleOutsideClick(event, 'editModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeEditModal()">&times;</span>
+            <div class="section-header" style="border-bottom: 2px dashed var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; background: none; color: var(--text-main);">Edit Lead</h2>
+            </div>
+            <form id="editLeadForm" class="form-grid">
+                <div class="full-width">
+                    <label for="edit-name">Lead Name</label>
+                    <input type="text" id="edit-name" required>
+                </div>
+                <div class="full-width">
+                    <label for="edit-company">Company</label>
+                    <input type="text" id="edit-company" required>
+                </div>
+                <div>
+                    <label for="edit-phone">Phone Number</label>
+                    <div class="phone-input-group">
+                        <span class="phone-prefix">+91</span>
+                        <input type="tel" id="edit-phone" required pattern="[0-9]{10}" maxlength="10" title="Please enter exactly 10 digits">
+                    </div>
+                </div>
+                <div>
+                    <label for="edit-location">Location</label>
+                    <input type="text" id="edit-location" required>
+                </div>
+                <div class="full-width">
+                    <label for="edit-email">Email Address</label>
+                    <input type="email" id="edit-email" required>
+                </div>
+                
+                <div class="full-width">
+                    <label>Product Interest (Select Multiple)</label>
+                    <div class="chip-group">
+                        <label class="chip-label">
+                            <input type="checkbox" name="edit-product" value="HoloBox">
+                            <span class="chip">HoloBox</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="edit-product" value="HoloWall">
+                            <span class="chip">HoloWall</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="edit-product" value="HoloStage">
+                            <span class="chip">HoloStage</span>
+                        </label>
+                        <label class="chip-label">
+                            <input type="checkbox" name="edit-product" value="AR/VR">
+                            <span class="chip">AR/VR</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="full-width">
+                    <label for="edit-comments">Interaction Log (Original)</label>
+                    <textarea id="edit-comments" rows="3"></textarea>
+                </div>
+                <div class="full-width">
+                    <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">Update Lead</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contact / Follow Up Modal -->
+    <div id="contactModal" class="modal" onclick="handleOutsideClick(event, 'contactModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeContactModal()">&times;</span>
+            <div class="section-header" style="border-bottom: 2px dashed var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; background: none; color: var(--text-main);">Contact Lead</h2>
+            </div>
+            
+            <div class="lead-meta-box" id="contactLeadDetails"></div>
+
+            <label>Follow-up History</label>
+            <div class="history-list" id="followUpHistory"></div>
+
+            <form id="contactForm" class="form-grid" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <div class="full-width">
+                    <label for="followup-note">Add New Follow-up Note</label>
+                    <textarea id="followup-note" rows="3" required placeholder="What was discussed?"></textarea>
+                </div>
+                
+                <div>
+                    <label for="disposition">Disposition Outcome</label>
+                    <select id="disposition" required onchange="toggleDateInput()">
+                        <option value="" disabled selected>Select an outcome...</option>
+                        <option value="Interested">Interested</option>
+                        <option value="Casual Query">Casual Query</option>
+                        <option value="Follow Up Later">Follow Up Later</option>
+                        <option value="No Response">No Response</option>
+                        <option value="Not Interested">Not Interested</option>
+                    </select>
+                </div>
+
+                <div id="dateInputContainer" style="display: none;">
+                    <label for="followup-date" id="dateLabel">Next Follow-up Date</label>
+                    <input type="date" id="followup-date" onclick="this.showPicker && this.showPicker()">
+                </div>
+                
+                <div class="full-width">
+                    <button type="submit" class="btn-primary">Save Follow-up</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Read-Only History Modal -->
+    <div id="historyModal" class="modal" onclick="handleOutsideClick(event, 'historyModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
+            <div class="section-header" style="border-bottom: 2px dashed var(--border-color); padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; background: none; color: var(--text-main);">Interaction Log History</h2>
+            </div>
+            <div class="lead-meta-box" id="historyLeadDetails"></div>
+            <label>Complete Interaction Trail</label>
+            <div class="history-list" id="fullHistoryList" style="max-height: 300px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let leads = JSON.parse(localStorage.getItem('crmLeads')) || [];
+        let editingIndex = null; 
+        let contactingIndex = null;
+        let currentView = 'pipeline'; 
+        let isAdminLoggedIn = sessionStorage.getItem('isAdminLoggedIn') === 'true';
+        const ADMIN_PIN = "1234"; // Default admin PIN
+
+        // Restrict phone input to digits only
+        document.querySelectorAll('#phone, #edit-phone').forEach(input => {
+            input.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '').slice(0, 10);
+            });
+        });
+
+        // Theme Management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('crmTheme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeButton(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('crmTheme', newTheme);
+            updateThemeButton(newTheme);
+        }
+
+        function updateThemeButton(theme) {
+            const btn = document.getElementById('themeToggleBtn');
+            if (theme === 'dark') {
+                btn.innerHTML = '☀️ Light Mode';
+            } else {
+                btn.innerHTML = '🌙 Dark Mode';
+            }
+        }
+
+        initTheme();
+        updateAdminUI();
+
+        function handleAdminAction() {
+            if (isAdminLoggedIn) {
+                if (confirm("Are you sure you want to log out of Admin mode?")) {
+                    isAdminLoggedIn = false;
+                    sessionStorage.removeItem('isAdminLoggedIn');
+                    updateAdminUI();
+                    renderTable();
+                }
+            } else {
+                document.getElementById('adminLoginModal').style.display = 'block';
+                document.getElementById('adminPinInput').value = '';
+                document.getElementById('adminPinInput').focus();
+            }
+        }
+
+        function closeAdminLoginModal() {
+            document.getElementById('adminLoginModal').style.display = 'none';
+        }
+
+        function verifyAdminPin(e) {
+            e.preventDefault();
+            const enteredPin = document.getElementById('adminPinInput').value;
+            if (enteredPin === ADMIN_PIN) {
+                isAdminLoggedIn = true;
+                sessionStorage.setItem('isAdminLoggedIn', 'true');
+                closeAdminLoginModal();
+                updateAdminUI();
+                renderTable();
+                alert("Successfully logged in as Admin.");
+            } else {
+                alert("Incorrect PIN. Access denied.");
+                document.getElementById('adminPinInput').value = '';
+            }
+        }
+
+        function updateAdminUI() {
+            const authBtn = document.getElementById('adminAuthBtn');
+            if (isAdminLoggedIn) {
+                authBtn.innerHTML = '🔓 Logout Admin';
+                authBtn.style.borderColor = '#34d399';
+                authBtn.style.color = '#34d399';
+            } else {
+                authBtn.innerHTML = '🔒 Admin Login';
+                authBtn.style.borderColor = 'var(--border-color)';
+                authBtn.style.color = 'var(--text-main)';
+                document.getElementById('batchDeleteBtn').style.display = 'none';
+            }
+        }
+
+        function openLeadModal() {
+            document.getElementById('leadModal').style.display = 'block';
+            setMinDateForPickers();
+        }
+
+        function closeLeadModal() {
+            document.getElementById('leadModal').style.display = 'none';
+            document.getElementById('leadForm').reset();
+            document.getElementById('initialContactFields').style.display = 'none';
+        }
+
+        // Helper to set minimum date to today (restricting backdating)
+        function setMinDateForPickers() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const initDateInput = document.getElementById('initialFollowupDate');
+            const fuDateInput = document.getElementById('followup-date');
+            if (initDateInput) initDateInput.min = todayStr;
+            if (fuDateInput) fuDateInput.min = todayStr;
+        }
+
+        // Helper to check if the Add Form is completely empty
+        function isLeadFormEmpty() {
+            const name = document.getElementById('name').value.trim();
+            const company = document.getElementById('company').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const location = document.getElementById('location').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const source = document.getElementById('leadSource').value;
+            const comments = document.getElementById('comments').value.trim();
+            const checkboxes = document.querySelectorAll('input[name="product"]:checked');
+
+            const hasCheckboxes = checkboxes.length > 0;
+
+            return !name && !company && !phone && !location && !email && !source && !comments && !hasCheckboxes;
+        }
+
+        function handleOutsideClick(event, modalId) {
+            if (modalId === 'leadModal') {
+                if (isLeadFormEmpty()) {
+                    closeLeadModal();
+                }
+            } else {
+                if (modalId === 'editModal') closeEditModal();
+                if (modalId === 'contactModal') closeContactModal();
+                if (modalId === 'historyModal') closeHistoryModal();
+                if (modalId === 'adminLoginModal') closeAdminLoginModal();
+            }
+        }
+
+        function formatDateTime(isoString) {
+            if (!isoString) return 'N/A';
+            const date = new Date(isoString);
+            return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatJustDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function toggleInitialDisposition() {
+            const source = document.getElementById('leadSource').value;
+            const container = document.getElementById('initialContactFields');
+            const initDisp = document.getElementById('initialDisposition');
+
+            if (source.includes('Phone') || source.includes('WhatsApp')) {
+                container.style.display = 'block';
+                initDisp.required = true;
+            } else {
+                container.style.display = 'none';
+                initDisp.required = false;
+                initDisp.value = '';
+                document.getElementById('initialDateContainer').style.display = 'none';
+                document.getElementById('initialFollowupDate').required = false;
+                document.getElementById('initialFollowupDate').value = '';
+            }
+        }
+
+        function toggleInitialDateInput() {
+            const disp = document.getElementById('initialDisposition').value;
+            const dateContainer = document.getElementById('initialDateContainer');
+            const dateInput = document.getElementById('initialFollowupDate');
+
+            if (disp === 'Interested' || disp === 'Follow Up Later' || disp === 'No Response') {
+                dateContainer.style.display = 'block';
+                dateInput.required = true;
+                setMinDateForPickers(); 
+            } else {
+                dateContainer.style.display = 'none';
+                dateInput.required = false;
+                dateInput.value = '';
+            }
+        }
+
+        function switchView(viewName) {
+            currentView = viewName;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const titles = {
+                'pipeline': 'Lead Directory (Pipeline)',
+                'pending': 'Pending Contact Leads',
+                'nextDay': 'Next Day - FU Leads',
+                'missed': 'Missed Follow Up Leads',
+                'next7Days': 'Next 7 Days - FU Leads',
+                'remaining': 'Remaining-FU Leads',
+                'dead': 'Dead Leads (Not Interested)'
+            };
+            document.getElementById('viewTitle').textContent = titles[viewName];
+
+            renderTable();
+        }
+
+        // Helper logic to check if a lead has a missed follow up (scheduled date is strictly before today)
+        function checkIsMissed(lead) {
+            const hasBeenContacted = lead.followUps && lead.followUps.length > 0;
+            let nextFollowUpDate = null;
+            let latestDisposition = null;
+            if (hasBeenContacted) {
+                latestDisposition = lead.followUps[lead.followUps.length - 1].disposition;
+                for (let i = lead.followUps.length - 1; i >= 0; i--) {
+                    if (lead.followUps[i].nextDate) {
+                        nextFollowUpDate = lead.followUps[i].nextDate;
+                        break;
+                    }
+                }
+            }
+
+            if (latestDisposition === 'Not Interested') return false;
+            if (!nextFollowUpDate) return false;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const fDate = new Date(nextFollowUpDate);
+            fDate.setHours(0, 0, 0, 0);
+
+            return fDate.getTime() < today.getTime();
+        }
+
+        // Helper to extract active next follow-up date for a lead
+        function getNextFollowUpDate(lead) {
+            if (!lead.followUps || lead.followUps.length === 0) return null;
+            for (let i = lead.followUps.length - 1; i >= 0; i--) {
+                if (lead.followUps[i].nextDate) {
+                    return lead.followUps[i].nextDate;
+                }
+            }
+            return null;
+        }
+
+        function updateMissedTabVisibility() {
+            const hasMissedLeads = leads.some(lead => checkIsMissed(lead));
+            const missedBtn = document.getElementById('missedTabBtn');
+            if (hasMissedLeads) {
+                missedBtn.style.display = 'inline-block';
+            } else {
+                missedBtn.style.display = 'none';
+                if (currentView === 'missed') {
+                    switchViewToPipeline();
+                }
+            }
+        }
+
+        function switchViewToPipeline() {
+            currentView = 'pipeline';
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.tab-pipeline').classList.add('active');
+            document.getElementById('viewTitle').textContent = 'Lead Directory (Pipeline)';
+            renderTable();
+        }
+
+        function filterLeadsByView(lead) {
+            const isMissed = checkIsMissed(lead);
+            const hasBeenContacted = lead.followUps && lead.followUps.length > 0;
+            let nextFollowUpDate = null;
+            let latestDisposition = null;
+            if (hasBeenContacted) {
+                latestDisposition = lead.followUps[lead.followUps.length - 1].disposition;
+                for (let i = lead.followUps.length - 1; i >= 0; i--) {
+                    if (lead.followUps[i].nextDate) {
+                        nextFollowUpDate = lead.followUps[i].nextDate;
+                        break;
+                    }
+                }
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (currentView === 'pipeline') {
+                return true;
+            } else if (currentView === 'pending') {
+                return !hasBeenContacted && !nextFollowUpDate;
+            } else if (currentView === 'dead') {
+                return latestDisposition === 'Not Interested';
+            } else if (currentView === 'missed') {
+                return isMissed;
+            } else {
+                if (latestDisposition === 'Not Interested' || isMissed) return false;
+
+                if (!nextFollowUpDate) return false;
+                const fDate = new Date(nextFollowUpDate);
+                fDate.setHours(0, 0, 0, 0);
+
+                const tomorrow = new Date(today);
+                tomorrow.setDate(today.getDate() + 1);
+
+                const sevenDaysOut = new Date(today);
+                sevenDaysOut.setDate(today.getDate() + 7);
+
+                if (currentView === 'nextDay') {
+                    return fDate.getTime() === tomorrow.getTime();
+                } else if (currentView === 'next7Days') {
+                    return fDate.getTime() >= tomorrow.getTime() && fDate.getTime() <= sevenDaysOut.getTime();
+                } else if (currentView === 'remaining') {
+                    return fDate.getTime() > sevenDaysOut.getTime();
+                }
+            }
+            return true;
+        }
+
+        function renderTable() {
+            updateMissedTabVisibility();
+
+            const headerRow = document.getElementById('tableHeaderRow');
+            const showExtraNextDateCol = (currentView === 'next7Days' || currentView === 'remaining');
+
+            // Configure table headers dynamically with admin select-all checkbox support
+            let selectAllHeader = isAdminLoggedIn ? `<th><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)"></th>` : '';
+
+            if (showExtraNextDateCol) {
+                headerRow.innerHTML = `
+                    ${selectAllHeader}
+                    <th>Entry Date & Time</th>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Products</th>
+                    <th>Status</th>
+                    <th>Disposition</th>
+                    <th>Interaction Log</th>
+                    <th>Next Follow-up Date</th>
+                    <th>Actions</th>
+                `;
+            } else {
+                headerRow.innerHTML = `
+                    ${selectAllHeader}
+                    <th>Entry Date & Time</th>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Products</th>
+                    <th>Status</th>
+                    <th>Disposition</th>
+                    <th>Interaction Log</th>
+                    <th>Actions</th>
+                `;
+            }
+
+            const tbody = document.getElementById('leadTableBody');
+            tbody.innerHTML = '';
+
+            const mappedLeads = leads.map((lead, index) => ({ lead, index }));
+            mappedLeads.sort((a, b) => new Date(b.lead.createdAt) - new Date(a.lead.createdAt));
+
+            const filteredLeads = mappedLeads.filter(item => filterLeadsByView(item.lead));
+
+            let totalCols = showExtraNextDateCol ? 9 : 8;
+            if (isAdminLoggedIn) totalCols++;
+
+            if (filteredLeads.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state">No leads found in this view.</td></tr>`;
+                updateBatchDeleteButtonVisibility();
+                return;
+            }
+
+            const now = new Date().getTime();
+            const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+            filteredLeads.forEach(({ lead, index }) => {
+                let productsArray = Array.isArray(lead.product) ? lead.product : (lead.product ? [lead.product] : []);
+                let productHtml = productsArray.map(p => `<span class="product-tag">${p}</span>`).join('');
+
+                const createdAtTime = lead.createdAt ? new Date(lead.createdAt).getTime() : 0; 
+                
+                const isWithinTime = (now - createdAtTime) <= TWENTY_FOUR_HOURS;
+                const hasBeenEdited = (lead.editCount && lead.editCount > 0);
+                
+                let editActionHtml = '';
+                if (currentView === 'pipeline' && (isAdminLoggedIn || (isWithinTime && !hasBeenEdited))) {
+                    editActionHtml = `<button class="btn-action btn-edit" onclick="openEditModal(${index})">Edit</button>`;
+                }
+
+                let deleteActionHtml = '';
+                if (isAdminLoggedIn) {
+                    deleteActionHtml = `<button class="btn-action btn-delete" onclick="deleteLead(${index})">Delete</button>`;
+                }
+
+                let selectCheckboxHtml = '';
+                if (isAdminLoggedIn) {
+                    selectCheckboxHtml = `<td><input type="checkbox" class="lead-checkbox" data-index="${index}" onclick="updateBatchDeleteButtonVisibility()"></td>`;
+                }
+
+                const hasBeenContacted = lead.followUps && lead.followUps.length > 0;
+                let statusHtml = hasBeenContacted 
+                    ? `<span class="status-badge">Contacted</span>`
+                    : `<span class="status-badge">Pending Contact</span>`;
+
+                const isMissed = checkIsMissed(lead);
+                let dispositionText = 'Pending Contact';
+                if (hasBeenContacted) {
+                    const latest = lead.followUps[lead.followUps.length - 1];
+                    dispositionText = latest.disposition;
+                    if (isMissed) {
+                        dispositionText = 'Missed Follow Up';
+                    }
+                }
+                let dispositionHtml = `<span class="status-badge">${dispositionText}</span>`;
+
+                const row = document.createElement('tr');
+                if (currentView === 'pipeline' && isMissed) {
+                    row.className = 'missed-row-highlight';
+                }
+
+                let nextDateColumnHtml = '';
+                if (showExtraNextDateCol) {
+                    const nextFuDateVal = getNextFollowUpDate(lead);
+                    nextDateColumnHtml = `<td style="font-weight: 700;">${formatJustDate(nextFuDateVal)}</td>`;
+                }
+
+                row.innerHTML = `
+                    ${selectCheckboxHtml}
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">${formatDateTime(lead.createdAt)}</td>
+                    <td style="font-weight: 700;">${lead.name}</td>
+                    <td><span class="company-tag">${lead.company}</span></td>
+                    <td class="product-cell">${productHtml}</td>
+                    <td>${statusHtml}</td>
+                    <td>${dispositionHtml}</td>
+                    <td>
+                        <span class="comment-link" onclick="openHistoryModal(${index})">View History</span>
+                    </td>
+                    ${nextDateColumnHtml}
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action btn-contact" onclick="openContactModal(${index})">Contact</button>
+                            ${editActionHtml}
+                            ${deleteActionHtml}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            updateBatchDeleteButtonVisibility();
+        }
+
+        window.toggleSelectAll = function(source) {
+            const checkboxes = document.querySelectorAll('.lead-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+            updateBatchDeleteButtonVisibility();
+        };
+
+        window.updateBatchDeleteButtonVisibility = function() {
+            if (!isAdminLoggedIn) return;
+            const checkedBoxes = document.querySelectorAll('.lead-checkbox:checked');
+            const batchBtn = document.getElementById('batchDeleteBtn');
+            if (checkedBoxes.length > 0) {
+                batchBtn.style.display = 'inline-block';
+                batchBtn.textContent = `🗑️ Delete Selected (${checkedBoxes.length})`;
+            } else {
+                batchBtn.style.display = 'none';
+            }
+        };
+
+        window.batchDeleteSelected = function() {
+            if (!isAdminLoggedIn) return;
+            const checkedBoxes = document.querySelectorAll('.lead-checkbox:checked');
+            if (checkedBoxes.length === 0) return;
+
+            if (confirm(`Are you sure you want to delete ${checkedBoxes.length} selected lead(s)?`)) {
+                const indicesToDelete = Array.from(checkedBoxes).map(cb => parseInt(cb.getAttribute('data-index')));
+                
+                // Sort descending to safely splice array elements without index shifting issues
+                indicesToDelete.sort((a, b) => b - a);
+                indicesToDelete.forEach(idx => {
+                    leads.splice(idx, 1);
+                });
+
+                localStorage.setItem('crmLeads', JSON.stringify(leads));
+                renderTable();
+            }
+        };
+
+        window.deleteLead = function(index) {
+            if (!isAdminLoggedIn) {
+                alert("Unauthorized action. Admin login required.");
+                return;
+            }
+            if (confirm(`Are you sure you want to permanently delete lead: ${leads[index].name} (${leads[index].company})?`)) {
+                leads.splice(index, 1);
+                localStorage.setItem('crmLeads', JSON.stringify(leads));
+                renderTable();
+            }
+        };
+
+        document.getElementById('leadForm').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+
+            const checkboxes = document.querySelectorAll('input[name="product"]:checked');
+            const selectedProducts = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedProducts.length === 0) {
+                alert("Please select at least one product of interest.");
+                return;
+            }
+
+            const rawPhone = document.getElementById('phone').value.trim();
+            if (rawPhone.length !== 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+            const fullPhone = "+91 " + rawPhone;
+
+            const leadSource = document.getElementById('leadSource').value;
+            let followUps = [];
+
+            if (leadSource.includes('Phone') || leadSource.includes('WhatsApp')) {
+                const initDisp = document.getElementById('initialDisposition').value;
+                const requiresDate = (initDisp === 'Interested' || initDisp === 'Follow Up Later' || initDisp === 'No Response');
+                const nextDate = requiresDate ? document.getElementById('initialFollowupDate').value : null;
+
+                followUps.push({
+                    timestamp: new Date().toISOString(),
+                    note: "Initial conversation logged from source selection.",
+                    disposition: initDisp,
+                    nextDate: nextDate
+                });
+            }
+
+            const newLead = {
+                name: document.getElementById('name').value,
+                company: document.getElementById('company').value,
+                phone: fullPhone,
+                location: document.getElementById('location').value,
+                email: document.getElementById('email').value,
+                source: leadSource,
+                product: selectedProducts,
+                comments: document.getElementById('comments').value,
+                createdAt: new Date().toISOString(),
+                updatedAt: null,
+                editCount: 0,
+                followUps: followUps 
+            };
+
+            leads.push(newLead);
+            localStorage.setItem('crmLeads', JSON.stringify(leads));
+            closeLeadModal();
+            renderTable();
+        });
+
+        window.openEditModal = function(index) {
+            const lead = leads[index];
+            editingIndex = index;
+
+            document.getElementById('edit-name').value = lead.name;
+            document.getElementById('edit-company').value = lead.company;
+            
+            let cleanPhone = lead.phone ? lead.phone.replace('+91', '').trim() : '';
+            document.getElementById('edit-phone').value = cleanPhone;
+
+            document.getElementById('edit-location').value = lead.location;
+            document.getElementById('edit-email').value = lead.email;
+            document.getElementById('edit-comments').value = lead.comments;
+
+            const checkboxes = document.querySelectorAll('input[name="edit-product"]');
+            checkboxes.forEach(cb => {
+                cb.checked = Array.isArray(lead.product) && lead.product.includes(cb.value);
+            });
+
+            document.getElementById('editModal').style.display = 'block';
+        };
+
+        document.getElementById('editLeadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const checkboxes = document.querySelectorAll('input[name="edit-product"]:checked');
+            const selectedProducts = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedProducts.length === 0) {
+                alert("Please select at least one product of interest.");
+                return;
+            }
+
+            const rawPhone = document.getElementById('edit-phone').value.trim();
+            if (rawPhone.length !== 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+            const fullPhone = "+91 " + rawPhone;
+
+            if (editingIndex !== null) {
+                leads[editingIndex] = {
+                    ...leads[editingIndex], 
+                    name: document.getElementById('edit-name').value,
+                    company: document.getElementById('edit-company').value,
+                    phone: fullPhone,
+                    location: document.getElementById('edit-location').value,
+                    email: document.getElementById('edit-email').value,
+                    product: selectedProducts,
+                    comments: document.getElementById('edit-comments').value,
+                    updatedAt: new Date().toISOString(),
+                    editCount: isAdminLoggedIn ? (leads[editingIndex].editCount || 0) : ((leads[editingIndex].editCount || 0) + 1) 
+                };
+
+                localStorage.setItem('crmLeads', JSON.stringify(leads));
+                renderTable();
+                closeEditModal();
+            }
+        });
+
+        const metaBoxHTML = (lead) => `
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Lead Name</span>
+                <span class="lead-meta-value">${lead.name}</span>
+            </div>
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Company</span>
+                <span class="lead-meta-value">${lead.company}</span>
+            </div>
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Phone</span>
+                <span class="lead-meta-value">${lead.phone}</span>
+            </div>
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Location</span>
+                <span class="lead-meta-value">${lead.location}</span>
+            </div>
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Source</span>
+                <span class="lead-meta-value">${lead.source || 'N/A'}</span>
+            </div>
+            <div class="lead-meta-item">
+                <span class="lead-meta-label">Email</span>
+                <span class="lead-meta-value"><a href="mailto:${lead.email}">${lead.email}</a></span>
+            </div>
+        `;
+
+        window.openContactModal = function(index) {
+            const lead = leads[index];
+            contactingIndex = index;
+
+            document.getElementById('contactLeadDetails').innerHTML = metaBoxHTML(lead);
+
+            const historyContainer = document.getElementById('followUpHistory');
+            historyContainer.innerHTML = ''; 
+
+            historyContainer.innerHTML += `
+                <div class="history-item">
+                    <div class="history-meta">
+                        <span>Original Entry (${lead.source || 'Direct'})</span>
+                        <span>${formatDateTime(lead.createdAt)}</span>
+                    </div>
+                    <div>${lead.comments || '<em>No initial interaction log added.</em>'}</div>
+                </div>
+            `;
+
+            if (lead.followUps && lead.followUps.length > 0) {
+                lead.followUps.forEach(fu => {
+                    let dateHtml = fu.nextDate ? ` | Set Follow-up: ${formatJustDate(fu.nextDate)}` : '';
+                    historyContainer.innerHTML += `
+                        <div class="history-item">
+                            <div class="history-meta">
+                                <span><span class="disp-badge">${fu.disposition}</span>${dateHtml}</span>
+                                <span>Logged: ${formatDateTime(fu.timestamp)}</span>
+                            </div>
+                            <div>${fu.note}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            setMinDateForPickers();
+
+            document.getElementById('contactModal').style.display = 'block';
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        };
+
+        window.toggleDateInput = function() {
+            const disp = document.getElementById('disposition').value;
+            const dateContainer = document.getElementById('dateInputContainer');
+            const dateInput = document.getElementById('followup-date');
+            
+            if (disp === 'Interested' || disp === 'Follow Up Later' || disp === 'No Response') {
+                dateContainer.style.display = 'block';
+                dateInput.required = true;
+                setMinDateForPickers();
+            } else {
+                dateContainer.style.display = 'none';
+                dateInput.required = false;
+                dateInput.value = ''; 
+            }
+        };
+
+        document.getElementById('contactForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (contactingIndex !== null) {
+                if (!leads[contactingIndex].followUps) {
+                    leads[contactingIndex].followUps = [];
+                }
+
+                const disposition = document.getElementById('disposition').value;
+                const requiresDate = (disposition === 'Interested' || disposition === 'Follow Up Later' || disposition === 'No Response');
+                const nextDate = requiresDate ? document.getElementById('followup-date').value : null;
+
+                const newFollowUp = {
+                    timestamp: new Date().toISOString(),
+                    note: document.getElementById('followup-note').value,
+                    disposition: disposition,
+                    nextDate: nextDate
+                };
+
+                leads[contactingIndex].followUps.push(newFollowUp);
+                
+                localStorage.setItem('crmLeads', JSON.stringify(leads));
+                renderTable();
+                closeContactModal();
+            }
+        });
+
+        window.openHistoryModal = function(index) {
+            const lead = leads[index];
+            document.getElementById('historyLeadDetails').innerHTML = metaBoxHTML(lead);
+
+            const fullHistoryList = document.getElementById('fullHistoryList');
+            fullHistoryList.innerHTML = `
+                <div class="history-item">
+                    <div class="history-meta">
+                        <span>Original Entry (${lead.source || 'Direct'})</span>
+                        <span>${formatDateTime(lead.createdAt)}</span>
+                    </div>
+                    <div>${lead.comments || '<em>No initial interaction log added.</em>'}</div>
+                </div>
+            `;
+
+            if (lead.followUps && lead.followUps.length > 0) {
+                lead.followUps.forEach(fu => {
+                    let dateHtml = fu.nextDate ? ` | Set Follow-up: ${formatJustDate(fu.nextDate)}` : '';
+                    fullHistoryList.innerHTML += `
+                        <div class="history-item">
+                            <div class="history-meta">
+                                <span><span class="disp-badge">${fu.disposition}</span>${dateHtml}</span>
+                                <span>Logged: ${formatDateTime(fu.timestamp)}</span>
+                            </div>
+                            <div>${fu.note}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('historyModal').style.display = 'block';
+        };
+
+        window.closeEditModal = function() {
+            document.getElementById('editModal').style.display = 'none';
+            document.getElementById('editLeadForm').reset();
+            editingIndex = null;
+        };
+
+        window.closeContactModal = function(event) {
+            document.getElementById('contactModal').style.display = 'none';
+            document.getElementById('contactForm').reset();
+            toggleDateInput(); 
+            contactingIndex = null;
+        };
+
+        window.closeHistoryModal = function() {
+            document.getElementById('historyModal').style.display = 'none';
+        };
+
+        renderTable();
+    </script>
+</body>
+</html>
