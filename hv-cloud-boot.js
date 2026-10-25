@@ -57,3 +57,20 @@
   st.textContent = 'html.hv-locked body{visibility:hidden}html.hv-locked #hvAuth{visibility:visible}';
   document.head.appendChild(st);
 })();
+
+/* Offline support + "Install app" button. */
+(function () {
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
+  window.hvInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    window.hvInstallPrompt = e;
+    document.dispatchEvent(new Event('hv-installable'));
+  });
+  window.addEventListener('appinstalled', function () {
+    window.hvInstallPrompt = null;
+    document.dispatchEvent(new Event('hv-installable'));
+  });
+})();

@@ -96,10 +96,18 @@ let chip;
 function setChip() {
   if (!uid) { if (chip) chip.remove(); chip = null; return; }
   if (!chip) {
-    chip = el('<div id="hvChip"><span id="hvChipText"></span><button type="button" id="hvOut" title="Sign out of this device">Sign out</button></div>');
+    chip = el('<div id="hvChip"><span id="hvChipText"></span><button type="button" id="hvInstall" title="Install as an app on this device" style="display:none">📲 Install app</button><button type="button" id="hvOut" title="Sign out of this device">Sign out</button></div>');
     document.body.appendChild(chip);
     chip.querySelector('#hvOut').onclick = signOutHere;
+    chip.querySelector('#hvInstall').onclick = async () => {
+      const p = window.hvInstallPrompt; if (!p) return;
+      p.prompt();
+      try { await p.userChoice; } catch (e) {}
+      window.hvInstallPrompt = null; setChip();
+    };
+    document.addEventListener('hv-installable', setChip);
   }
+  chip.querySelector('#hvInstall').style.display = window.hvInstallPrompt ? '' : 'none';
   const s = C.state();
   const busy = C.KEYS.some(k => pushing[k] || timers[k] || (s[k] && s[k].dirty));
   chip.querySelector('#hvChipText').textContent =
