@@ -1,6 +1,12 @@
-# No build step: the folder is published as-is.
+# The website is the "public" folder; the server jobs are in netlify/functions.
 [build]
-  publish = "."
+  publish = "public"
+  command = "echo no build step"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin", "web-push"]
 
 # Always check for the newest app files, so updates show without a hard refresh.
 [[headers]]

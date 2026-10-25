@@ -96,7 +96,7 @@ let chip;
 function setChip() {
   if (!uid) { if (chip) chip.remove(); chip = null; return; }
   if (!chip) {
-    chip = el('<div id="hvChip"><span id="hvChipText"></span><button type="button" id="hvInstall" title="Install as an app on this device" style="display:none">📲 Install app</button><button type="button" id="hvOut" title="Sign out of this device">Sign out</button></div>');
+    chip = el('<div id="hvChip"><span id="hvChipText"></span><button type="button" id="hvInstall" title="Install as an app on this device" style="display:none">📲 Install app</button><button type="button" id="hvBell" title="Get meeting, demo and task reminders on this device, even when the app is closed" style="display:none">🔔 Turn on reminders</button><button type="button" id="hvOut" title="Sign out of this device">Sign out</button></div>');
     document.body.appendChild(chip);
     chip.querySelector('#hvOut').onclick = signOutHere;
     chip.querySelector('#hvInstall').onclick = async () => {
@@ -106,12 +106,66 @@ function setChip() {
       window.hvInstallPrompt = null; setChip();
     };
     document.addEventListener('hv-installable', setChip);
+    chip.querySelector('#hvBell').onclick = enableReminders;
   }
   chip.querySelector('#hvInstall').style.display = window.hvInstallPrompt ? '' : 'none';
+  chip.querySelector('#hvBell').style.display = pushState === 'off' ? '' : 'none';
   const s = C.state();
   const busy = C.KEYS.some(k => pushing[k] || timers[k] || (s[k] && s[k].dirty));
   chip.querySelector('#hvChipText').textContent =
     !online ? (busy ? '⚠ Offline · changes will sync' : '⚠ Offline') : busy ? '⟳ Saving…' : '☁ Synced';
+}
+
+/* ---------- phone/desktop notifications ---------- */
+let pushState = 'unknown';          // 'off' (button shown), 'on', 'unsupported'
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
+function b64ToBytes(b64) {
+  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+}
+async function saveSubscription(sub) {
+  await fb.setDoc(fb.doc(db, 'users', uid, 'push', deviceName()), {
+    subscription: JSON.parse(JSON.stringify(sub)), device: deviceName(),
+    userAgent: navigator.userAgent.slice(0, 200), updatedAt: fb.serverTimestamp() });
+}
+async function checkReminders() {
+  if (!pushSupported()) { pushState = 'unsupported'; setChip(); return; }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') { pushState = 'on'; saveSubscription(sub).catch(() => {}); }
+    else pushState = Notification.permission === 'denied' ? 'unsupported' : 'off';
+  } catch (e) { pushState = 'off'; }
+  setChip();
+}
+async function enableReminders() {
+  const btn = document.getElementById('hvBell');
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = '🔔 Turning on…'; }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      alert('Notifications are blocked for this site. Allow them in the browser\'s site settings (lock icon next to the address), then try again.');
+      return;
+    }
+    const keyRes = await fetch('/api/push-key', { cache: 'no-store' });
+    const key = await keyRes.json();
+    if (!key.publicKey) throw new Error(key.error || 'no key');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key.publicKey) });
+    await saveSubscription(sub);
+    pushState = 'on';
+    const token = await auth.currentUser.getIdToken();
+    fetch('/api/push-test', { method: 'POST', headers: { authorization: 'Bearer ' + token } }).catch(() => {});
+  } catch (err) {
+    console.error('[hvCloud] reminders', err);
+    alert(/server-not-configured/.test(String(err && err.message))
+      ? 'Reminders are not set up on the server yet.'
+      : 'Could not turn on reminders. Check your internet connection and try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔔 Turn on reminders'; }
+    setChip();
+  }
 }
 
 /* ---------- helpers ---------- */
@@ -302,6 +356,7 @@ async function start() {
     C.armed = true;
     listen();
     hideAuth();
+    checkReminders();
     setChip();
     if (changed) requestReload();
   });

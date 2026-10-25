@@ -2,7 +2,7 @@
    The app's own files: fetched fresh when online (so updates appear at once), cached copy when offline.
    Library files (Firebase SDK, Excel reader): versioned URLs, so the cached copy is used first.
    Firebase data/sign-in traffic is not touched here; Firebase has its own offline storage. */
-const CACHE = 'hv-crm-v1';
+const CACHE = 'hv-crm-v2';
 const APP_FILES = ['/', '/index.html', '/hv-cloud-boot.js', '/hv-cloud.js', '/firebase-config.js',
   '/HVLogo.png', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/favicon-64.png'];
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
@@ -44,6 +44,7 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== self.location.origin) return;   // everything else off-site: leave alone
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/')) return;
 
   e.respondWith((async () => {                // network first, cache when offline
     try {
@@ -55,5 +56,30 @@ self.addEventListener('fetch', (e) => {
       if (hit) return hit;
       throw err;
     }
+  })());
+});
+
+/* ---- Notifications sent by the reminder job ---- */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'Hypervision CRM', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Hypervision CRM', {
+    body: d.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/favicon-64.png',
+    tag: d.tag || undefined,
+    renotify: !!d.tag,
+    requireInteraction: /starting now|30 minutes/.test(d.title || ''),
+    data: { url: d.url || '/' }
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) if (w.url.startsWith(self.location.origin)) { await w.focus(); return; }
+    await self.clients.openWindow(target);
   })());
 });

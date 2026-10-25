@@ -1,0 +1,11 @@
+{
+  "name": "hypervision-crm",
+  "private": true,
+  "type": "module",
+  "description": "Hypervision CRM: static site in public/, reminder push jobs in netlify/functions/",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "web-push": "^3.6.7"
+  }
+}
