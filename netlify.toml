@@ -1,0 +1,11 @@
+# No build step: the folder is published as-is.
+[build]
+  publish = "."
+
+# Always check for the newest app files, so updates show without a hard refresh.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"
