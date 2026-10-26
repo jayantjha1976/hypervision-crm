@@ -6283,6 +6283,44 @@
             .table-container { max-height: none; }
         }
 
+        /* ===== Phone tidy-up (list layout kept): nothing wider than the screen; only tables scroll sideways inside their box ===== */
+        @media (max-width: 640px) {
+            body { padding: 6px 8px; }
+            .container { max-width: 100%; overflow-x: hidden; }
+            .card { padding: 8px; min-width: 0; }
+
+            /* top bar: sections on one line, other buttons wrap onto lines below */
+            .top-navbar { padding: 6px; gap: 6px; }
+            .nav-left, .nav-right { width: 100%; min-width: 0; }
+            .top-navbar .section-switch { display: flex; width: 100%; }
+            .top-navbar .section-btn { flex: 1 1 auto; padding: 6px 4px; font-size: 0.72rem; white-space: nowrap; }
+            .nav-right { flex-wrap: wrap !important; gap: 5px; }
+            .nav-right > button { flex: 1 1 auto; padding: 6px 6px; font-size: 0.7rem; }
+
+            /* search on its own line, Partner + Potential side by side, Add button full width */
+            .toolbar-row { flex-direction: column; align-items: stretch; gap: 8px; }
+            .toolbar-row .filter-controls-bar, .filter-controls-bar { order: 2; margin: 0; width: 100%; flex-wrap: wrap; gap: 6px; padding: 0; }
+            .filter-controls-left { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+            .filter-controls-right { width: 100%; display: flex; gap: 6px; }
+            .filter-controls-right > * { flex: 1 1 0; }
+            .filter-group { min-width: 0; }
+            .filter-controls-left .filter-group:first-child { flex: 1 1 100%; }
+            .filter-controls-left .filter-group:not(:first-child) { flex: 1 1 40%; }
+            .filter-controls-bar .filter-group:first-child input[type="text"] { width: 100% !important; height: 34px !important; font-size: 0.85rem !important; }
+            .filter-controls-bar .filter-group:not(:first-child) .custom-select-wrapper,
+            .filter-controls-bar .filter-group:not(:first-child) select,
+            #filterMainCatWrapper, #filterSubCatWrapper { width: 100% !important; min-width: 0; }
+            .fin-range { flex-basis: 100% !important; }
+
+            /* Pipeline / Missed / Pending … : compact pills, several per line, pipeline value on its own line */
+            .toolbar-row .nav-tabs, #taskTabs, #finTabs { order: 1; width: 100%; gap: 5px; margin: 0; }
+            .tab-btn, .task-tab-btn, .fin-tab { padding: 5px 8px; font-size: 0.72rem; gap: 4px; }
+            .pipeline-value { flex: 1 1 100%; margin-left: 0; text-align: center; }
+
+            /* tables keep the list layout and scroll sideways inside their own box */
+            .table-container { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        }
+
         /* 📞 call button beside the lead name: phones only */
         .lead-call-btn { display: none; }
         @media (max-width: 640px) {
