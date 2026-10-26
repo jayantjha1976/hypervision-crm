@@ -736,7 +736,6 @@
                     <button type="button" class="section-btn" id="sectionBtnNotes" onclick="hvSwitchSection('notes')">📝 Notes</button>
                     <button type="button" class="section-btn" id="sectionBtnFinance" onclick="hvSwitchSection('finance')">💰 Finance</button>
                 </div>
-                <button type="button" class="m-menu-btn m-only" id="mobileMenuBtn" onclick="hvToggleMobileMenu(event)" aria-label="More options" title="More options">⋯</button>
                 <h2 class="leads-only">Lead Management</h2>
                 <span id="viewTitle" class="view-title-text leads-only">Pipeline</span>
                 <h2 class="tasks-only">Task Management</h2>
@@ -2582,11 +2581,11 @@
 
                 let selectCheckboxHtml = '';
                 if (isAdminLoggedIn) {
-                    selectCheckboxHtml = `<td class="m-hide" onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-index="${index}" onclick="updateBatchDeleteButtonVisibility()"></td>`;
+                    selectCheckboxHtml = `<td onclick="event.stopPropagation()"><input type="checkbox" class="lead-checkbox" data-index="${index}" onclick="updateBatchDeleteButtonVisibility()"></td>`;
                 }
 
                 let starCellHtml = `
-                    <td class="m-star" style="text-align: center;" onclick="event.stopPropagation()">
+                    <td style="text-align: center;" onclick="event.stopPropagation()">
                         <button class="star-btn ${lead.isStarred ? 'starred' : ''}" onclick="toggleStarLead(${index}, event)">
                             ${lead.isStarred ? '★' : '☆'}
                         </button>
@@ -2630,18 +2629,18 @@
                 if (layoutView === 'starred') {
                     const stageLabels = { pipeline: 'Pipeline', missed: 'Missed Follow Up', pending: 'Pending Contact', converted: 'Converted', dead: 'Dead', parked: 'Parked' };
                     const stageKey = getLeadHomeView(lead);
-                    stageCellHtml = `<td class="m-stage"><span class="stage-pill stage-${stageKey}">${stageLabels[stageKey] || stageKey}</span></td>`;
+                    stageCellHtml = `<td><span class="stage-pill stage-${stageKey}">${stageLabels[stageKey] || stageKey}</span></td>`;
                 }
 
                 let customColumnHtml = '';
                 if (layoutView === 'converted') {
                     customColumnHtml = `
-                        <td class="m-hide">${formatJustDate(lead.dealClosureDate)}</td>
-                        <td class="m-hide"><span class="sale-value-text">${formatCurrency(lead.saleValue)}</span></td>
+                        <td>${formatJustDate(lead.dealClosureDate)}</td>
+                        <td><span class="sale-value-text">${formatCurrency(lead.saleValue)}</span></td>
                     `;
                 } else if (layoutView === 'parked') {
                     customColumnHtml = `
-                        <td class="m-hide">${formatJustDate(lead.parkedAt)}</td>
+                        <td>${formatJustDate(lead.parkedAt)}</td>
                     `;
                 } else if (showExtraNextDateCol) {
                     const nextVal = getNextFollowUpDate(lead);
@@ -2653,34 +2652,27 @@
                             formattedNextVal = formatJustDate(nextVal);
                         }
                     }
-                    customColumnHtml = `<td class="m-next${nextVal ? '' : ' m-empty'}">${formattedNextVal}</td>`;
+                    customColumnHtml = `<td>${formattedNextVal}</td>`;
                 }
 
                 const quoteColHtml = lead.quoteValue
-                    ? `<td class="m-hide"><span class="quote-value-text" title="Latest quote amount">${formatCurrency(lead.quoteValue)}</span></td>`
-                    : `<td class="m-hide"><span style="color: var(--text-muted);">—</span></td>`;
-                let dispColHtml = layoutView === 'parked' ? quoteColHtml : `${stageCellHtml}<td class="m-disp">${dispositionHtml}</td>${quoteColHtml}`;
-
-                /* Phone layout: a 📞 Call button (shown only on small screens) */
-                const telNumber = String(lead.phone || '').replace(/[^0-9+]/g, '');
-                const callActionHtml = telNumber
-                    ? `<a class="btn-action btn-call m-only" href="tel:${telNumber}" onclick="event.stopPropagation()">📞 Call</a>`
-                    : '';
+                    ? `<td><span class="quote-value-text" title="Latest quote amount">${formatCurrency(lead.quoteValue)}</span></td>`
+                    : `<td><span style="color: var(--text-muted);">—</span></td>`;
+                let dispColHtml = layoutView === 'parked' ? quoteColHtml : `${stageCellHtml}<td>${dispositionHtml}</td>${quoteColHtml}`;
 
                 row.innerHTML = `
                     ${selectCheckboxHtml}
                     ${starCellHtml}
-                    <td class="m-hide" style="font-weight: 600; color: var(--text-muted);">${serialNum + 1}</td>
-                    <td class="m-hide" style="font-size: 0.75rem; color: var(--text-muted);">${formatJustDate(lead.createdAt)}</td>
-                    <td class="m-name">${lead.name}</td>
-                    <td class="m-company"><span class="company-tag" title="${lead.company}">${lead.company}</span></td>
+                    <td style="font-weight: 600; color: var(--text-muted);">${serialNum + 1}</td>
+                    <td style="font-size: 0.75rem; color: var(--text-muted);">${formatJustDate(lead.createdAt)}</td>
+                    <td>${lead.name}</td>
+                    <td><span class="company-tag" title="${lead.company}">${lead.company}</span></td>
                     <td class="strength-cell" title="${lead.subCategory ? String(lead.subCategory).replace(/"/g, '&quot;') + ' — click' : 'Unassigned — click'} to change lead strength" onclick="event.stopPropagation(); openStrengthPicker(${index}, this)">${categoryDisplayHtml}</td>
-                    <td class="product-cell product-pick-cell m-hide" title="${productsArray.length ? String(productsArray.join(', ')).replace(/"/g, '&quot;') + ' — click to change' : 'Click to add products'}" onclick="event.stopPropagation(); openProductPicker(${index}, this)">${productHtml || '<span class="product-empty">+ Add</span>'}<span class="product-count">${productsArray.length ? productsArray.length : '+'}</span></td>
+                    <td class="product-cell product-pick-cell" title="${productsArray.length ? String(productsArray.join(', ')).replace(/"/g, '&quot;') + ' — click to change' : 'Click to add products'}" onclick="event.stopPropagation(); openProductPicker(${index}, this)">${productHtml || '<span class="product-empty">+ Add</span>'}<span class="product-count">${productsArray.length ? productsArray.length : '+'}</span></td>
                     ${dispColHtml}
                     ${customColumnHtml}
-                    <td class="m-actions">
+                    <td>
                         <div class="action-buttons">
-                            ${callActionHtml}
                             <button class="btn-action btn-contact" onclick="event.stopPropagation(); openContactModal(${index})">Update History</button>
                             ${parkActionHtml}
                             ${editCatActionHtml}
@@ -4455,18 +4447,18 @@
                     : (t.reminderTime ? '🔔 ' + formatTime(t.reminderTime) : '<span style="color: var(--text-muted);">—</span>');
                 return `
                     <tr class="clickable-row ${t.done ? 'task-done-row' : ''} ${overdue ? 'task-overdue-row' : ''}" onclick="hvOpenTaskModal('${t.id}')">
-                        <td class="m-check" style="text-align: center;" onclick="event.stopPropagation()"><input type="checkbox" class="task-check" ${t.done ? 'checked' : ''} title="${t.done ? 'Mark as not done' : 'Mark as done'}" onchange="hvToggleTask('${t.id}')"></td>
-                        <td class="m-hide" style="font-weight: 600; color: var(--text-muted);">${i + 1}</td>
+                        <td style="text-align: center;" onclick="event.stopPropagation()"><input type="checkbox" class="task-check" ${t.done ? 'checked' : ''} title="${t.done ? 'Mark as not done' : 'Mark as done'}" onchange="hvToggleTask('${t.id}')"></td>
+                        <td style="font-weight: 600; color: var(--text-muted);">${i + 1}</td>
                         <td class="task-main-cell">
                             <div class="task-title-text">${esc(t.title)}</div>
                             ${t.notes ? `<div class="task-notes-text">${esc(t.notes)}</div>` : ''}
                         </td>
-                        <td class="m-hide">${t.category ? `<span class="category-badge">${esc(t.category)}</span>` : '<span style="color: var(--text-muted);">—</span>'}</td>
-                        <td class="m-pri"><span class="task-pri task-pri-${t.priority.toLowerCase()}">${t.priority}</span></td>
-                        <td class="m-due">${dueCellHtml(t, today)}</td>
-                        <td class="m-hide">${seventhCol}</td>
-                        <td class="m-hide">${t.repeat !== 'none' ? '🔁 ' + REPEAT_LABEL[t.repeat] : '<span style="color: var(--text-muted);">—</span>'}</td>
-                        <td class="m-hide">
+                        <td>${t.category ? `<span class="category-badge">${esc(t.category)}</span>` : '<span style="color: var(--text-muted);">—</span>'}</td>
+                        <td><span class="task-pri task-pri-${t.priority.toLowerCase()}">${t.priority}</span></td>
+                        <td>${dueCellHtml(t, today)}</td>
+                        <td>${seventhCol}</td>
+                        <td>${t.repeat !== 'none' ? '🔁 ' + REPEAT_LABEL[t.repeat] : '<span style="color: var(--text-muted);">—</span>'}</td>
+                        <td>
                             <div class="action-buttons">
                                 <button class="btn-action btn-contact" onclick="event.stopPropagation(); hvOpenTaskModal('${t.id}')">Edit</button>
                                 <button class="btn-action btn-delete" onclick="event.stopPropagation(); hvDeleteTask('${t.id}')">Delete</button>
@@ -5857,17 +5849,17 @@
                     partyHtml += `<span class="fin-inv">Bill ${esc(t.billNo)}</span>`;
                 }
                 return `<tr class="fin-row${isUncat(t) ? ' fin-row-uncat' : ''}" onclick="hvFinOpenTxnModal('${t.id}')">
-                    <td class="m-hide" style="font-weight: 600; color: var(--text-muted);">${i + 1}</td>
-                    <td class="m-date">${esc(fmtDate(t.date))}</td>
-                    <td class="fin-ref m-hide" title="${esc(t.refNo)}">${esc(t.refNo) || '<span style="color:var(--text-muted)">—</span>'}</td>
-                    <td class="fin-narr m-narr" title="${esc(t.narration)}">${esc(t.narration)}</td>
-                    ${showAcct ? `<td class="fin-acct m-hide">${esc(t.account || '')}</td>` : ''}
-                    <td class="fin-amt credit${isCr ? '' : ' m-hide'}">${isCr ? money(t.amount) : ''}</td>
-                    <td class="fin-amt debit${isCr ? ' m-hide' : ''}">${isCr ? '' : money(t.amount)}</td>
-                    <td class="m-cat" onclick="event.stopPropagation()"><select class="fin-cat-select${t.category ? '' : ' empty'}" onchange="hvFinQuickCategory('${t.id}', this.value)">${categoryOptions(t.type, t.category)}</select></td>
-                    <td class="m-hide">${partyHtml}</td>
-                    <td class="fin-comments m-hide" title="${esc(t.comments)}">${esc(t.comments)}</td>
-                    <td class="m-hide" onclick="event.stopPropagation()"><div class="action-buttons">
+                    <td style="font-weight: 600; color: var(--text-muted);">${i + 1}</td>
+                    <td>${esc(fmtDate(t.date))}</td>
+                    <td class="fin-ref" title="${esc(t.refNo)}">${esc(t.refNo) || '<span style="color:var(--text-muted)">—</span>'}</td>
+                    <td class="fin-narr" title="${esc(t.narration)}">${esc(t.narration)}</td>
+                    ${showAcct ? `<td class="fin-acct">${esc(t.account || '')}</td>` : ''}
+                    <td class="fin-amt credit">${isCr ? money(t.amount) : ''}</td>
+                    <td class="fin-amt debit">${isCr ? '' : money(t.amount)}</td>
+                    <td onclick="event.stopPropagation()"><select class="fin-cat-select${t.category ? '' : ' empty'}" onchange="hvFinQuickCategory('${t.id}', this.value)">${categoryOptions(t.type, t.category)}</select></td>
+                    <td>${partyHtml}</td>
+                    <td class="fin-comments" title="${esc(t.comments)}">${esc(t.comments)}</td>
+                    <td onclick="event.stopPropagation()"><div class="action-buttons">
                         <button type="button" class="btn-action btn-edit" onclick="hvFinOpenTxnModal('${t.id}')">Edit</button>
                         <button type="button" class="btn-action btn-delete" onclick="hvFinDeleteTxn('${t.id}')">Delete</button>
                     </div></td>
@@ -6285,136 +6277,5 @@
             .table-container { max-height: none; }
         }
     </style>
-
-    <style>
-        /* ===== Phone layout (screens up to 640px wide). The laptop layout is not affected. ===== */
-        .m-only { display: none !important; }
-        .m-menu-btn { border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); border-radius: 8px; font-size: 1.2rem; font-weight: 700; line-height: 1; width: 40px; height: 36px; cursor: pointer; flex: 0 0 auto; }
-        .btn-call { background: #059669; color: #ffffff; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-
-        @media (max-width: 640px) {
-            .m-only { display: inline-flex !important; }
-            html, body { overflow-x: hidden; }
-            body { padding: 6px 8px; }
-            .card { padding: 8px; }
-
-            /* Top bar: one swipeable row of sections + a ⋯ menu for the other buttons */
-            .top-navbar { position: relative; flex-direction: row; flex-wrap: nowrap; padding: 6px; gap: 6px; margin-bottom: 6px; }
-            .nav-left { width: 100%; flex-wrap: nowrap; gap: 6px; }
-            .nav-center { display: none; }
-            .top-navbar .section-switch { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-            .top-navbar .section-switch::-webkit-scrollbar { display: none; }
-            .top-navbar .section-switch { gap: 2px; padding: 3px; }
-            .top-navbar .section-btn { flex: 1 0 auto; white-space: nowrap; padding: 8px 5px; font-size: 0.74rem; letter-spacing: -0.1px; }
-            .top-navbar .section-badge { margin-left: 3px; padding-left: 5px; padding-right: 5px; }
-            .m-menu-btn { width: 36px; }
-            .m-menu-btn { align-items: center; justify-content: center; }
-            .nav-right { display: none !important; }
-            .top-navbar.m-menu-open { z-index: 1400; }
-            .top-navbar.m-menu-open .nav-right {
-                display: flex !important; flex-direction: column; align-items: stretch; flex-wrap: nowrap;
-                position: absolute; top: calc(100% + 4px); right: 0; width: auto; min-width: 210px; z-index: 1500;
-                padding: 8px; gap: 6px; border-radius: 12px; border: 1px solid var(--border-color);
-                background: var(--card-bg); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-            }
-            .top-navbar.m-menu-open .nav-right > button { text-align: left; font-size: 0.9rem; padding: 10px 12px; }
-
-            /* Search + add button on one line, filters below, counters as one swipeable strip */
-            .toolbar-row { flex-direction: column; align-items: stretch; gap: 6px; }
-            .toolbar-row .filter-controls-bar { order: 1; margin: 0; width: 100%; }
-            .filter-controls-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin-bottom: 6px; background: transparent; border: none; }
-            .filter-controls-left, .filter-controls-right { display: contents; }
-            .filter-controls-bar .filter-group { min-width: 0; }
-            .filter-controls-bar .filter-group:first-child { order: 1; flex: 1 1 55%; }
-            .filter-controls-bar .filter-group:first-child input[type="text"] { width: 100% !important; height: 38px !important; font-size: 0.9rem !important; }
-            .filter-controls-right > * { order: 2; flex: 0 0 auto; height: 38px; }
-            .filter-controls-bar .filter-group:not(:first-child) { order: 3; flex: 1 1 40%; }
-            .filter-controls-bar .filter-group:not(:first-child) .custom-select-wrapper,
-            .filter-controls-bar .filter-group:not(:first-child) select,
-            #filterMainCatWrapper, #filterSubCatWrapper { width: 100% !important; min-width: 0; }
-            .filter-controls-bar .custom-select-wrapper .custom-select, .filter-controls-bar .task-filter-select { height: 36px !important; min-height: 36px; font-size: 0.85rem; }
-            .fin-range { flex-basis: 100% !important; display: flex; gap: 6px; align-items: center; }
-            .fin-range input[type="date"] { flex: 1 1 0; min-width: 0; }
-            #financeSection .filter-controls-bar .filter-group:first-child { flex-basis: 100%; }
-            #financeSection .filter-controls-right > * { order: 4; flex: 1 1 0; font-size: 0.78rem; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
-
-            .toolbar-row .nav-tabs, #taskTabs, #finTabs { order: 2; width: 100%; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin: 0; padding-bottom: 2px; }
-            .toolbar-row .nav-tabs::-webkit-scrollbar { display: none; }
-            .tab-btn, .task-tab-btn, .fin-tab { flex: 0 0 auto; white-space: nowrap; padding: 7px 10px; font-size: 0.8rem; }
-            .pipeline-value { flex: 0 0 auto; margin-left: 0; font-size: 0.8rem; }
-
-            /* Tables become cards */
-            .table-container { overflow: visible; max-height: none !important; border: none; border-radius: 0; }
-            #leadTable, #taskTable, #finTable { display: block; width: 100%; }
-            #leadTable thead, #taskTable thead { display: none; }
-            #leadTable tbody, #taskTable tbody, #finTable tbody { display: block; }
-            #leadTable tbody tr, #taskTable tbody tr, #finTable tbody tr {
-                position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
-                padding: 10px 10px 10px 42px; margin-bottom: 8px;
-                border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--card-bg);
-            }
-            #leadTable td, #taskTable td, #finTable td { display: block; padding: 0; border: none; white-space: normal; min-width: 0; }
-            #leadTable td.m-hide, #taskTable td.m-hide, #finTable td.m-hide { display: none; }
-            #leadTable td.empty-state, #taskTable td.empty-state, #finTable td.fin-empty { flex: 1 1 100%; }
-            #leadTable tbody tr:has(td.empty-state), #taskTable tbody tr:has(td.empty-state), #finTable tbody tr:has(td.fin-empty) { padding-left: 10px; }
-
-            /* Lead card: ☆ | Name · Strength / Company / Disposition · Next follow-up / buttons */
-            #leadTable td.m-star { position: absolute; left: 6px; top: 8px; width: 30px; }
-            #leadTable .star-btn { font-size: 1.3rem; }
-            #leadTable td.m-name { order: 1; flex: 1 1 0; font-size: 1rem; font-weight: 700; }
-            #leadTable td.strength-cell { order: 2; flex: 0 0 auto; padding: 0; }
-            /* always show the full Hot / Warm / Cold badge on the phone, even when the column is collapsed on the laptop */
-            #leadTable.col-collapsed-strength .strength-cell > span { width: auto; height: auto; font-size: 0.75rem !important; padding: 3px 10px !important; border-radius: 10px; }
-            #leadTable.col-collapsed-strength .strength-cell > span:not([class]) { border: none; padding: 0 !important; }
-            #leadTable.col-collapsed-strength .strength-cell > .strength-badge-hot { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
-            #leadTable.col-collapsed-strength .strength-cell > .strength-badge-warm { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); }
-            #leadTable.col-collapsed-strength .strength-cell > .strength-badge-cold { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
-            #leadTable.col-collapsed-strength .strength-cell > .category-badge { background: var(--input-bg); border: 1px solid var(--input-border); }
-            #leadTable td.m-company { order: 3; flex: 0 0 100%; }
-            #leadTable .company-tag { max-width: 100%; }
-            #leadTable td.m-stage { order: 4; }
-            #leadTable td.m-disp { order: 5; }
-            #leadTable td.m-next { order: 6; margin-left: auto; font-size: 0.78rem; color: var(--text-muted); }
-            #leadTable td.m-next::before { content: "Next: "; }
-            #leadTable td.m-next.m-empty { display: none; }
-            #leadTable td.m-actions { order: 7; flex: 0 0 100%; margin-top: 4px; }
-            #leadTable .action-buttons, #taskTable .action-buttons { flex-wrap: wrap; gap: 6px; }
-            #leadTable .action-buttons > * { flex: 1 1 0; min-height: 36px; font-size: 0.82rem; display: inline-flex; align-items: center; justify-content: center; }
-
-            /* Task card: ☐ | Task · Priority / Due date */
-            #taskTable td.m-check { position: absolute; left: 10px; top: 12px; }
-            #taskTable td.m-check input { width: 20px; height: 20px; }
-            #taskTable td.task-main-cell { order: 1; flex: 1 1 0; min-width: 0; max-width: none; font-size: 0.95rem; }
-            #taskTable td.m-pri { order: 2; flex: 0 0 auto; }
-            #taskTable td.m-due { order: 3; flex: 0 0 100%; font-size: 0.8rem; }
-
-            /* Finance card: Date · Amount / Narration / Category */
-            #finTable thead { display: none; }
-            #finTable tbody tr { padding-left: 10px; }
-            #finTable td.m-date { order: 1; flex: 1 1 0; font-weight: 600; }
-            #finTable td.fin-amt { order: 2; flex: 0 0 auto; font-weight: 700; font-size: 0.95rem; }
-            #finTable td.m-narr { order: 3; flex: 0 0 100%; max-width: none; white-space: normal; }
-            #finTable td.m-cat { order: 4; flex: 0 0 100%; }
-            #finTable .fin-cat-select { width: 100%; height: 34px !important; font-size: 0.85rem !important; }
-
-            /* Pop-up windows use the full width */
-            .modal-content { width: auto !important; max-width: none !important; margin: 10px !important; }
-        }
-    </style>
-
-    <script>
-        /* Phone layout: ⋯ menu with Backup / Export / Restore / Theme / Admin */
-        window.hvToggleMobileMenu = function (e) {
-            if (e) e.stopPropagation();
-            document.querySelector('.top-navbar').classList.toggle('m-menu-open');
-        };
-        document.addEventListener('click', function (e) {
-            const bar = document.querySelector('.top-navbar');
-            if (!bar || !bar.classList.contains('m-menu-open')) return;
-            if (e.target.closest('#mobileMenuBtn')) return;
-            /* close after any choice in the menu, or a tap anywhere else */
-            bar.classList.remove('m-menu-open');
-        });
-    </script>
 </body>
 </html>
