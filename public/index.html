@@ -1128,6 +1128,12 @@
                 </div>
 
                 <div class="full-width">
+                    <label style="margin-bottom: 4px;">Other people <span style="font-weight: 400; color: var(--text-muted);">(Optional)</span></label>
+                    <div id="newLeadPeopleRows"></div>
+                    <button type="button" class="people-add-btn" onclick="hvAddNewLeadPersonRow()">+ Add person</button>
+                </div>
+
+                <div class="full-width">
                     <button type="submit" class="btn-primary">Save Lead</button>
                 </div>
             </form>
@@ -1267,6 +1273,7 @@
                     <span id="accordionArrow">▼ Click to Expand</span>
                 </div>
                 <div class="lead-meta-box" id="contactLeadDetails" style="display: none;"></div>
+                <div id="leadPeoplePanel" class="people-panel"></div>
 
                 <label style="margin-top: 6px;">Complete Interaction Trail</label>
                 <div class="history-list" id="fullHistoryList" style="max-height: 200px; margin-top: 4px;"></div>
@@ -2047,6 +2054,7 @@
             document.getElementById('leadModal').style.display = 'none';
             document.getElementById('leadForm').reset();
             resetCustomSelect('addLeadSourceWrapper', 'Select lead source...', 'leadSource');
+            if (window.hvClearNewLeadPeople) hvClearNewLeadPeople();
         }
 
         function closeDuplicateModal() {
@@ -2268,7 +2276,8 @@
 
                 const searchName = (lead.name || '').toLowerCase();
                 const searchCompany = (lead.company || '').toLowerCase();
-                return searchName.includes(globalSearchQuery) || searchCompany.includes(globalSearchQuery);
+                if (searchName.includes(globalSearchQuery) || searchCompany.includes(globalSearchQuery)) return true;
+                return window.hvLeadPeopleSearchText ? hvLeadPeopleSearchText(lead).includes(globalSearchQuery) : false;
             }
 
             if (currentView === 'starred') {
@@ -2663,7 +2672,7 @@
                 /* 📞 call button next to the name (shown on phones only) */
                 const telNumber = String(lead.phone || '').replace(/[^0-9+]/g, '');
                 const callBtnHtml = telNumber
-                    ? `<a class="lead-call-btn" href="tel:${telNumber}" onclick="event.stopPropagation()" title="Call ${telNumber}" aria-label="Call">📞</a>`
+                    ? `<a class="lead-call-btn" href="tel:${telNumber}" onclick="event.stopPropagation(); if (window.hvCallPick) hvCallPick(event, ${index});" title="Call" aria-label="Call">📞</a>`
                     : '';
 
                 row.innerHTML = `
@@ -2671,7 +2680,7 @@
                     ${starCellHtml}
                     <td style="font-weight: 600; color: var(--text-muted);">${serialNum + 1}</td>
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${formatJustDate(lead.createdAt)}</td>
-                    <td>${callBtnHtml}${lead.name}</td>
+                    <td>${callBtnHtml}${lead.name}${(lead.contacts && lead.contacts.length) ? `<span class="people-count-badge" title="${lead.contacts.length} more ${lead.contacts.length === 1 ? 'person' : 'people'} on this lead">+${lead.contacts.length}</span>` : ''}</td>
                     <td><span class="company-tag" title="${lead.company}">${lead.company}</span></td>
                     <td class="strength-cell" title="${lead.subCategory ? String(lead.subCategory).replace(/"/g, '&quot;') + ' — click' : 'Unassigned — click'} to change lead strength" onclick="event.stopPropagation(); openStrengthPicker(${index}, this)">${categoryDisplayHtml}</td>
                     <td class="product-cell product-pick-cell" title="${productsArray.length ? String(productsArray.join(', ')).replace(/"/g, '&quot;') + ' — click to change' : 'Click to add products'}" onclick="event.stopPropagation(); openProductPicker(${index}, this)">${productHtml || '<span class="product-empty">+ Add</span>'}<span class="product-count">${productsArray.length ? productsArray.length : '+'}</span></td>
@@ -2813,6 +2822,8 @@
             }
             const fullPhone = "+91 " + rawPhone;
             const leadSource = document.getElementById('leadSource').value;
+            const newLeadPeople = window.hvCollectNewLeadPeople ? hvCollectNewLeadPeople() : [];
+            if (newLeadPeople === null) return;   /* a person's number or email was not valid; message already shown */
 
             const newLeadData = {
                 name: document.getElementById('name').value.trim(),
@@ -2837,10 +2848,14 @@
                 saleValue: null,
                 isParked: false,
                 parkedAt: null,
-                parkedReason: null
+                parkedReason: null,
+                contacts: newLeadPeople
             };
 
-            const existingMatch = leads.find(l => l.phone.replace(/\s+/g, '') === fullPhone.replace(/\s+/g, ''));
+            const newNumbers = window.hvLeadPhoneKeys ? hvLeadPhoneKeys(newLeadData) : [fullPhone.replace(/\s+/g, '')];
+            const existingMatch = leads.find(l => window.hvLeadPhoneKeys
+                ? hvLeadPhoneKeys(l).some(k => newNumbers.includes(k))
+                : (l.phone || '').replace(/\s+/g, '') === fullPhone.replace(/\s+/g, ''));
             if (existingMatch) {
                 pendingDuplicateLead = newLeadData;
                 existingDuplicateMatch = existingMatch;
@@ -3658,7 +3673,8 @@
                 v = String(v);
                 return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
             };
-            const rows = [headers.join(',')].concat(leads.map(l => headers.map(h => cell(l[h])).join(',')));
+            const peopleText = list => (list || []).map(c => [c.name + (c.role ? ' (' + c.role + ')' : ''), c.phone, c.email].filter(Boolean).join(' ')).join('; ');
+            const rows = [headers.join(',')].concat(leads.map(l => headers.map(h => cell(h === 'contacts' ? peopleText(l[h]) : l[h])).join(',')));
             hvDownload(`HV_Leads_${hvStamp()}.csv`, '﻿' + rows.join('\r\n'), 'text/csv;charset=utf-8');
         };
         window.restoreLeadsJSON = function(input) {
@@ -6327,5 +6343,214 @@
             .lead-call-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-right: 8px; border-radius: 50%; background: #059669; text-decoration: none; font-size: 0.95rem; vertical-align: middle; }
         }
     </style>
+
+    <style>
+        /* ===== Other people on a lead ===== */
+        .people-count-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.65rem; font-weight: 700; background: var(--tab-pipeline); color: var(--tab-pipeline-text); border: 1px solid var(--border-color); vertical-align: middle; }
+        .people-add-btn { margin-top: 4px; padding: 5px 10px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; border: 1px dashed var(--input-border); background: transparent; color: var(--text-main); cursor: pointer; }
+        .people-row-inputs { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1.3fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+        .people-row-inputs input { height: 32px; font-size: 0.75rem; padding: 0 8px; min-width: 0; }
+        .people-row-remove { border: none; background: transparent; color: #dc2626; font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
+        .people-panel { margin: 6px 0 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--history-item-bg); }
+        .people-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
+        .people-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 0; border-top: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-main); }
+        .people-head + .people-item { border-top: none; }
+        .people-name { font-weight: 700; }
+        .people-role { color: var(--text-muted); font-style: italic; }
+        .people-item a { color: inherit; text-decoration: none; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); white-space: nowrap; }
+        .people-item .people-tools { margin-left: auto; display: flex; gap: 4px; }
+        .people-item .people-tools button { border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); border-radius: 6px; font-size: 0.7rem; padding: 2px 7px; cursor: pointer; }
+        .people-main-tag { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--tab-converted); color: var(--tab-converted-text); }
+        .people-edit { margin-top: 6px; }
+        .people-edit-actions { display: flex; gap: 6px; justify-content: flex-end; }
+        .people-edit-actions button { padding: 5px 12px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); }
+        .people-edit-actions .people-save { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+        #hvCallSheet { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.45); }
+        #hvCallSheet.open { display: flex; align-items: flex-end; justify-content: center; }
+        #hvCallSheet .sheet { width: 100%; max-width: 480px; background: var(--modal-bg); border-radius: 16px 16px 0 0; padding: 12px 12px 18px; box-shadow: 0 -8px 30px rgba(0,0,0,0.35); }
+        #hvCallSheet .sheet h4 { margin: 2px 4px 10px; font-size: 0.95rem; color: var(--text-main); }
+        #hvCallSheet .sheet a { display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 6px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); text-decoration: none; font-size: 0.9rem; }
+        #hvCallSheet .sheet a small { color: var(--text-muted); margin-left: auto; }
+        #hvCallSheet .sheet button { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--border-color); background: transparent; color: var(--text-main); font-weight: 600; font-size: 0.9rem; }
+        @media (max-width: 640px) {
+            .people-row-inputs { grid-template-columns: 1fr 1fr; }
+            .people-row-inputs .people-row-remove { grid-column: span 2; justify-self: end; }
+        }
+    </style>
+    <div id="hvCallSheet" onclick="if (event.target === this) hvCloseCallSheet()"><div class="sheet" id="hvCallSheetBody"></div></div>
+
+    <script>
+    /* ===== Other people on a lead: lead.contacts = [{ id, name, role, phone, email }] =====
+       The lead's own name / phone / email stay the main contact. Older leads simply have no contacts. */
+    (function () {
+        const $ = id => document.getElementById(id);
+        const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const newId = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const telOf = phone => String(phone || '').replace(/[^0-9+]/g, '');
+
+        /* "9876543210" → "+91 9876543210"; "+44 20 1234 5678" kept; '' allowed; anything else → null */
+        function cleanPhone(raw) {
+            const t = String(raw || '').trim();
+            if (!t) return '';
+            const digits = t.replace(/\D/g, '');
+            if (!t.startsWith('+') && digits.length === 10) return '+91 ' + digits;
+            if (!t.startsWith('+') && digits.length === 12 && digits.startsWith('91')) return '+91 ' + digits.slice(2);
+            if (t.startsWith('+91') && digits.length === 12) return '+91 ' + digits.slice(2);
+            if (t.startsWith('+') && digits.length >= 8 && digits.length <= 15) return t.replace(/[^\d+ ]/g, '').replace(/\s+/g, ' ');
+            return null;
+        }
+        const okEmail = e => !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
+        function checkPerson(p) {
+            if (!p.name) return 'Please enter a name for each person.';
+            const ph = cleanPhone(p.phone);
+            if (ph === null) return `The phone number for ${p.name} doesn't look right. Use 10 digits (e.g. 9876543210) or a number starting with +.`;
+            if (!okEmail(p.email)) return `The email for ${p.name} doesn't look right.`;
+            p.phone = ph;
+            return '';
+        }
+
+        window.hvLeadPhoneKeys = function (lead) {
+            const keys = [];
+            if (lead && lead.phone) keys.push(String(lead.phone).replace(/\s+/g, ''));
+            ((lead && lead.contacts) || []).forEach(c => { if (c.phone) keys.push(String(c.phone).replace(/\s+/g, '')); });
+            return keys;
+        };
+        window.hvLeadPeopleSearchText = function (lead) {
+            const parts = [lead.phone, lead.email, String(lead.phone || '').replace(/\D/g, '')];
+            (lead.contacts || []).forEach(c => parts.push(c.name, c.role, c.phone, c.email, String(c.phone || '').replace(/\D/g, '')));
+            return parts.filter(Boolean).join(' ').toLowerCase();
+        };
+
+        /* ---------- Add New Lead window ---------- */
+        window.hvAddNewLeadPersonRow = function () {
+            const row = document.createElement('div');
+            row.className = 'people-row-inputs';
+            row.innerHTML = `
+                <input type="text" class="np-name" placeholder="Name" maxlength="80">
+                <input type="text" class="np-role" placeholder="Role (optional)" maxlength="60">
+                <input type="tel" class="np-phone" placeholder="Phone" maxlength="20">
+                <input type="email" class="np-email" placeholder="Email (optional)" maxlength="120">
+                <button type="button" class="people-row-remove" title="Remove" onclick="this.parentNode.remove()">✕</button>`;
+            $('newLeadPeopleRows').appendChild(row);
+            row.querySelector('.np-name').focus();
+        };
+        window.hvClearNewLeadPeople = function () { if ($('newLeadPeopleRows')) $('newLeadPeopleRows').innerHTML = ''; };
+        window.hvCollectNewLeadPeople = function () {
+            const out = [];
+            for (const row of document.querySelectorAll('#newLeadPeopleRows .people-row-inputs')) {
+                const p = { id: newId(), name: row.querySelector('.np-name').value.trim(), role: row.querySelector('.np-role').value.trim(),
+                            phone: row.querySelector('.np-phone').value.trim(), email: row.querySelector('.np-email').value.trim() };
+                if (!p.name && !p.role && !p.phone && !p.email) continue;   /* empty row: ignore */
+                const err = checkPerson(p);
+                if (err) { alert(err); return null; }
+                out.push(p);
+            }
+            return out;
+        };
+
+        /* ---------- History window: People panel ---------- */
+        let editingId = null;   /* id being edited, 'new' for a new person, null when not editing */
+
+        function saveLeadsNow() {
+            localStorage.setItem('crmLeads', JSON.stringify(leads));
+            renderTable();
+        }
+
+        window.hvRenderPeople = function () {
+            const box = $('leadPeoplePanel');
+            if (!box) return;
+            const lead = leads[activeModalLeadIndex];
+            if (!lead) { box.innerHTML = ''; return; }
+            const list = lead.contacts || [];
+            const personLine = (c, isMain) => `
+                <div class="people-item">
+                    <span class="people-name">${esc(c.name)}</span>
+                    ${isMain ? '<span class="people-main-tag">Main</span>' : (c.role ? `<span class="people-role">${esc(c.role)}</span>` : '')}
+                    ${c.phone ? `<a href="tel:${esc(telOf(c.phone))}" title="Call">📞 ${esc(c.phone)}</a>` : ''}
+                    ${c.email ? `<a href="mailto:${esc(c.email)}" title="Email">✉️ ${esc(c.email)}</a>` : ''}
+                    ${isMain ? '' : `<span class="people-tools">
+                        <button type="button" onclick="hvEditPerson('${c.id}')">Edit</button>
+                        <button type="button" onclick="hvRemovePerson('${c.id}')">Remove</button></span>`}
+                </div>`;
+            const editing = editingId ? (editingId === 'new' ? { name: '', role: '', phone: '', email: '' } : list.find(c => c.id === editingId)) : null;
+            box.innerHTML = `
+                <div class="people-head">
+                    <span>👥 People (${list.length + 1})</span>
+                    ${editingId ? '' : '<button type="button" class="people-add-btn" style="margin:0;" onclick="hvEditPerson(\'new\')">+ Add person</button>'}
+                </div>
+                ${personLine({ name: lead.name, phone: lead.phone, email: lead.email }, true)}
+                ${list.map(c => personLine(c, false)).join('')}
+                ${editing ? `
+                <div class="people-edit">
+                    <div class="people-row-inputs" style="grid-template-columns: 1fr 1fr;">
+                        <input type="text" id="pe-name" placeholder="Name" maxlength="80" value="${esc(editing.name)}">
+                        <input type="text" id="pe-role" placeholder="Role (optional)" maxlength="60" value="${esc(editing.role)}">
+                        <input type="tel" id="pe-phone" placeholder="Phone" maxlength="20" value="${esc(editing.phone)}">
+                        <input type="email" id="pe-email" placeholder="Email (optional)" maxlength="120" value="${esc(editing.email)}">
+                    </div>
+                    <div class="people-edit-actions">
+                        <button type="button" onclick="hvCancelPerson()">Cancel</button>
+                        <button type="button" class="people-save" onclick="hvSavePerson()">Save</button>
+                    </div>
+                </div>` : ''}`;
+            if (editing) $('pe-name').focus();
+        };
+
+        window.hvEditPerson = function (id) { editingId = id; hvRenderPeople(); };
+        window.hvCancelPerson = function () { editingId = null; hvRenderPeople(); };
+        window.hvSavePerson = function () {
+            const lead = leads[activeModalLeadIndex];
+            if (!lead) return;
+            const p = { name: $('pe-name').value.trim(), role: $('pe-role').value.trim(), phone: $('pe-phone').value.trim(), email: $('pe-email').value.trim() };
+            const err = checkPerson(p);
+            if (err) { alert(err); return; }
+            if (!Array.isArray(lead.contacts)) lead.contacts = [];
+            if (editingId === 'new') lead.contacts.push(Object.assign({ id: newId() }, p));
+            else {
+                const c = lead.contacts.find(x => x.id === editingId);
+                if (c) Object.assign(c, p);
+            }
+            lead.updatedAt = new Date().toISOString();
+            editingId = null;
+            saveLeadsNow();
+            hvRenderPeople();
+        };
+        window.hvRemovePerson = function (id) {
+            const lead = leads[activeModalLeadIndex];
+            if (!lead || !lead.contacts) return;
+            const c = lead.contacts.find(x => x.id === id);
+            if (!c || !confirm(`Remove ${c.name} from this lead?`)) return;
+            lead.contacts = lead.contacts.filter(x => x.id !== id);
+            lead.updatedAt = new Date().toISOString();
+            saveLeadsNow();
+            hvRenderPeople();
+        };
+
+        /* show the panel whenever the history window opens */
+        const origHistory = window.switchToHistoryMode;
+        window.switchToHistoryMode = function () {
+            editingId = null;
+            const r = origHistory.apply(this, arguments);
+            hvRenderPeople();
+            return r;
+        };
+
+        /* ---------- 📞 on the phone: choose whom to call when there is more than one number ---------- */
+        window.hvCallPick = function (e, index) {
+            const lead = leads[index];
+            const others = ((lead && lead.contacts) || []).filter(c => c.phone);
+            if (!others.length) return;          /* only one number: let the link dial it */
+            e.preventDefault();
+            const item = (name, sub, phone) => `<a href="tel:${esc(telOf(phone))}" onclick="hvCloseCallSheet()">📞 <span><strong>${esc(name)}</strong>${sub ? ' · ' + esc(sub) : ''}</span><small>${esc(phone)}</small></a>`;
+            $('hvCallSheetBody').innerHTML = `<h4>Call someone at ${esc(lead.company || lead.name)}</h4>
+                ${lead.phone ? item(lead.name, 'Main', lead.phone) : ''}
+                ${others.map(c => item(c.name, c.role, c.phone)).join('')}
+                <button type="button" onclick="hvCloseCallSheet()">Cancel</button>`;
+            $('hvCallSheet').classList.add('open');
+        };
+        window.hvCloseCallSheet = function () { $('hvCallSheet').classList.remove('open'); };
+    })();
+    </script>
 </body>
 </html>
