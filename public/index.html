@@ -2660,12 +2660,18 @@
                     : `<td><span style="color: var(--text-muted);">—</span></td>`;
                 let dispColHtml = layoutView === 'parked' ? quoteColHtml : `${stageCellHtml}<td>${dispositionHtml}</td>${quoteColHtml}`;
 
+                /* 📞 call button next to the name (shown on phones only) */
+                const telNumber = String(lead.phone || '').replace(/[^0-9+]/g, '');
+                const callBtnHtml = telNumber
+                    ? `<a class="lead-call-btn" href="tel:${telNumber}" onclick="event.stopPropagation()" title="Call ${telNumber}" aria-label="Call">📞</a>`
+                    : '';
+
                 row.innerHTML = `
                     ${selectCheckboxHtml}
                     ${starCellHtml}
                     <td style="font-weight: 600; color: var(--text-muted);">${serialNum + 1}</td>
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${formatJustDate(lead.createdAt)}</td>
-                    <td>${lead.name}</td>
+                    <td>${callBtnHtml}${lead.name}</td>
                     <td><span class="company-tag" title="${lead.company}">${lead.company}</span></td>
                     <td class="strength-cell" title="${lead.subCategory ? String(lead.subCategory).replace(/"/g, '&quot;') + ' — click' : 'Unassigned — click'} to change lead strength" onclick="event.stopPropagation(); openStrengthPicker(${index}, this)">${categoryDisplayHtml}</td>
                     <td class="product-cell product-pick-cell" title="${productsArray.length ? String(productsArray.join(', ')).replace(/"/g, '&quot;') + ' — click to change' : 'Click to add products'}" onclick="event.stopPropagation(); openProductPicker(${index}, this)">${productHtml || '<span class="product-empty">+ Add</span>'}<span class="product-count">${productsArray.length ? productsArray.length : '+'}</span></td>
@@ -6275,6 +6281,12 @@
             .nav-left, .nav-right { width: auto; }
             .toolbar-row .filter-controls-bar { margin-left: 0; }
             .table-container { max-height: none; }
+        }
+
+        /* 📞 call button beside the lead name: phones only */
+        .lead-call-btn { display: none; }
+        @media (max-width: 640px) {
+            .lead-call-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin-right: 8px; border-radius: 50%; background: #059669; text-decoration: none; font-size: 0.95rem; vertical-align: middle; }
         }
     </style>
 </body>
