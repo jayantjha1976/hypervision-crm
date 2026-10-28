@@ -5523,17 +5523,22 @@
         #finPeriod { width: 125px; min-width: 0; }
         #finCategoryFilter { width: 150px; min-width: 0; }
         #finAccountFilter { width: 130px; min-width: 0; }
+        #finVendorFilter { width: 150px; min-width: 0; }
         #finTable th, #finTable td { padding: 5px 6px; }
         #finTable .action-buttons { display: flex; gap: 4px; }
         .fin-narr { max-width: 210px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: 0.72rem; }
         .fin-ref { font-size: 0.72rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+        .fin-cmt-input { width: 140px; min-width: 110px; height: 28px !important; padding: 0 7px !important; font-size: 0.72rem !important; border-width: 1px !important; border-style: dashed !important; background: transparent !important; transition: border-color 0.2s, box-shadow 0.2s; }
+        .fin-cmt-input:not(:placeholder-shown) { border-style: solid !important; background: var(--input-bg) !important; }
+        .fin-cmt-input:focus { border-style: solid !important; border-color: #6366f1 !important; background: var(--input-bg) !important; }
+        .fin-cmt-input.saved { border-color: #059669 !important; box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2); }
         .fin-comments { max-width: 150px; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; color: var(--text-muted); }
         .fin-row-uncat td:first-child { box-shadow: inset 3px 0 0 #d97706; }
         tr.fin-row { cursor: pointer; }
         .fin-cat-select { height: 28px !important; width: 180px; min-width: 0; font-size: 0.72rem !important; padding: 0 6px !important; border-width: 1px !important; }
         .fin-cat-select.empty { border-color: #d97706 !important; color: #b45309; font-style: italic; }
         .fin-party { font-size: 0.75rem; }
-        .fin-inv { display: block; font-size: 0.66rem; color: var(--text-muted); }
+        .fin-inv { display: block; font-size: 0.66rem; color: var(--text-muted); white-space: normal; max-width: 210px; line-height: 1.3; }
         .fin-warn-badge { display: inline-block; font-size: 0.64rem; font-weight: 700; color: #b45309; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 1px 6px; }
         .fin-acct { font-size: 0.68rem; color: var(--text-muted); }
         .fin-sort { cursor: pointer; user-select: none; }
@@ -6139,7 +6144,7 @@
                     <td class="fin-amt debit">${isCr ? '' : money(t.amount)}</td>
                     <td onclick="event.stopPropagation()"><select class="fin-cat-select${t.category ? '' : ' empty'}" onchange="hvFinQuickCategory('${t.id}', this.value)">${categoryOptions(t.type, t.category)}</select></td>
                     <td>${partyHtml}</td>
-                    <td class="fin-comments" title="${esc(t.comments)}">${esc(t.comments)}</td>
+                    <td onclick="event.stopPropagation()"><input type="text" class="fin-cmt-input" maxlength="1000" value="${esc(t.comments)}" title="${esc(t.comments) || 'Type a comment, then press Enter'}" placeholder="✎ Add comment…" onchange="hvFinQuickComment('${t.id}', this)" onkeydown="if (event.key === 'Enter') this.blur(); else if (event.key === 'Escape') { this.value = this.defaultValue; this.blur(); event.stopPropagation(); }"></td>
                     <td onclick="event.stopPropagation()"><div class="action-buttons">
                         <button type="button" class="btn-action btn-edit" onclick="hvFinOpenTxnModal('${t.id}')">Edit</button>
                         <button type="button" class="btn-action btn-delete" onclick="hvFinDeleteTxn('${t.id}')">Delete</button>
@@ -6157,6 +6162,18 @@
         };
 
         /* ---------- quick categorise from the list ---------- */
+        /* ---------- comment typed straight into the list ---------- */
+        window.hvFinQuickComment = function (id, el) {
+            const t = txns.find(x => x.id === id);
+            if (!t) return;
+            const v = el.value.trim();
+            if (v === (t.comments || '')) return;
+            t.comments = v;
+            t.updatedAt = new Date().toISOString();
+            save();
+            el.value = v; el.defaultValue = v; el.title = v || 'Type a comment, then press Enter';
+            el.classList.add('saved'); setTimeout(() => el.classList.remove('saved'), 900);
+        };
         window.hvFinQuickCategory = function (id, value) {
             const t = txns.find(x => x.id === id);
             if (!t) return;
