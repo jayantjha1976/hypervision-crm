@@ -952,8 +952,13 @@
                         <span class="filter-label">Category:</span>
                         <select id="finCategoryFilter" class="task-filter-select" onchange="hvRenderFinance()"></select>
                     </div>
+                    <div class="filter-group" id="finVendorFilterWrap" style="display: none;">
+                        <span class="filter-label">Vendor:</span>
+                        <select id="finVendorFilter" class="task-filter-select" onchange="hvRenderFinance()"></select>
+                    </div>
                 </div>
                 <div class="filter-controls-right">
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenVendors()" title="Vendor list, with each vendor's payments, invoices, TDS and advances">🏢 Vendors</button>
                     <button type="button" class="theme-toggle-btn" onclick="hvFinExportCSV()" title="Download the transactions shown as a CSV file (opens in Excel)">⬇️ Export</button>
                     <button type="button" class="theme-toggle-btn" onclick="hvFinOpenImport()" title="Upload a bank statement (CSV, XLS or XLSX)">⬆️ Import Statement</button>
                     <button type="button" class="btn-add-lead" onclick="hvFinOpenTxnModal(null)">+ Add Entry</button>
@@ -3705,7 +3710,7 @@
                     : `\nThis backup has no notes, so your current notes stay as they are.`;
                 const currentFinance = window.hvFinanceGetAll ? window.hvFinanceGetAll().transactions : [];
                 const financeLine = incomingFinance
-                    ? `\nIt also REPLACES the ${currentFinance.length} finance transactions with the ${incomingFinance.transactions.length} in this backup.`
+                    ? `\nIt also REPLACES the ${currentFinance.length} finance transactions with the ${incomingFinance.transactions.length} in this backup${Array.isArray(incomingFinance.vendors) ? ` (and the vendor list with its ${incomingFinance.vendors.length} vendors)` : ''}.`
                     : `\nThis backup has no finance data, so your current finance transactions stay as they are.`;
                 const ok = confirm(`Restore ${incoming.length} leads from "${file.name}"?\n\nThis REPLACES the ${leads.length} leads currently in the dashboard.${tasksLine}${notesLine}${financeLine}\nA safety backup of the current data will download first.`);
                 if (!ok) return;
@@ -5248,7 +5253,7 @@
                     <label for="fin-amount">Amount</label>
                     <div class="currency-input-group">
                         <span class="currency-prefix">₹</span>
-                        <input type="text" id="fin-amount" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this)" required>
+                        <input type="text" id="fin-amount" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateRecon(); hvFinUpdateVendorRecon();" required>
                     </div>
                 </div>
                 <div class="span-2">
@@ -5270,9 +5275,58 @@
                     <label for="fin-category" id="finCategoryLabel">Source</label>
                     <select id="fin-category" onchange="hvFinCategoryChanged()"></select>
                 </div>
-                <div class="span-2">
+                <div class="span-2" id="finPartyWrap">
                     <label for="fin-party" id="finPartyLabel">Received From</label>
                     <input type="text" id="fin-party" list="finPartyList" maxlength="120" placeholder="Customer / vendor name">
+                </div>
+                <div class="span-2" id="finVendorWrap" style="display: none;">
+                    <label for="fin-vendor">Vendor</label>
+                    <div class="fin-vendor-pick">
+                        <select id="fin-vendor" onchange="hvFinVendorPicked()"></select>
+                        <button type="button" class="fin-mini-btn" onclick="hvFinOpenVendorModal(null, 'txn')" title="Add a new vendor">+ New</button>
+                    </div>
+                    <div class="fin-vendor-hint" id="finVendorHint"></div>
+                </div>
+
+                <!-- Vendor payments: against an invoice, or an advance to adjust later -->
+                <div class="full-width fin-vendor-box" id="finVendorBox" style="display: none;">
+                    <div class="fin-box-heading fin-box-heading-vendor">🏢 Vendor Payment</div>
+                    <div class="fin-paykind" role="group" aria-label="Payment type">
+                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="invoice" onchange="hvFinPayKindChanged()" checked> 🧾 Against invoice</label>
+                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="advance" onchange="hvFinPayKindChanged()"> ⏳ Advance (adjust against future invoices)</label>
+                    </div>
+                    <div class="form-grid" id="finVinvGrid" style="gap: 8px; margin-top: 8px;">
+                        <div class="span-2">
+                            <label for="fin-vinv-no">Vendor Invoice No</label>
+                            <input type="text" id="fin-vinv-no" maxlength="60" placeholder="As printed on the vendor's bill" oninput="hvFinUpdateVendorRecon()">
+                        </div>
+                        <div class="span-2">
+                            <label for="fin-vinv-date">Invoice Date</label>
+                            <input type="date" id="fin-vinv-date">
+                        </div>
+                        <div class="span-2">
+                            <label for="fin-vinv-amount">Invoice Amount (incl. GST)</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fin-vinv-amount" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
+                        </div>
+                        <div class="span-2">
+                            <label for="fin-vinv-gst">GST in Invoice</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fin-vinv-gst" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this)"></div>
+                        </div>
+                        <div class="span-2">
+                            <label for="fin-vinv-tds">TDS Deducted (by us)</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fin-vinv-tds" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
+                        </div>
+                        <div class="span-2">
+                            <label for="fin-vinv-adv">Advance Adjusted</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fin-vinv-adv" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
+                        </div>
+                        <div class="full-width fin-recon" id="finVendorRecon"></div>
+                    </div>
+                    <div class="fin-recon" id="finAdvanceNote" style="display: none; margin-top: 8px;"></div>
                 </div>
 
                 <!-- Sales: invoice details -->
@@ -5369,6 +5423,67 @@
         </div>
     </div>
 
+    <!-- ===== Finance: Vendors list + vendor ledger ===== -->
+    <div id="finVendorsModal" class="modal" onclick="if (event.target === this) hvFinCloseVendors()">
+        <div class="modal-content" style="max-width: 1040px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="hvFinCloseVendors()">&times;</span>
+            <div id="finVendorsBody"></div>
+        </div>
+    </div>
+
+    <!-- ===== Finance: Add / Edit a vendor (opens on top of the other finance windows) ===== -->
+    <div id="finVendorModal" class="modal" onclick="if (event.target === this) hvFinCloseVendorModal()">
+        <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="hvFinCloseVendorModal()">&times;</span>
+            <h2 id="finVendorTitle" style="margin-bottom: 4px; font-size: 1.1rem;">Add Vendor</h2>
+            <div class="fin-modal-sub">Only the name is required. GSTIN fills in the PAN automatically.</div>
+            <form id="finVendorForm" class="form-grid" autocomplete="off" onsubmit="event.preventDefault(); hvFinSaveVendor();">
+                <div class="full-width">
+                    <label for="fv-name">Vendor Name *</label>
+                    <input type="text" id="fv-name" maxlength="120" placeholder="e.g. Sharma Fabricators Pvt Ltd" required>
+                </div>
+                <div class="span-2">
+                    <label for="fv-gstin">GST Number (GSTIN)</label>
+                    <input type="text" id="fv-gstin" maxlength="15" placeholder="15 characters, e.g. 09ABCDE1234F1Z5" oninput="hvFinGstinInput(this)" style="text-transform: uppercase;">
+                    <div class="fin-vendor-hint" id="fvGstinHint"></div>
+                </div>
+                <div class="span-2">
+                    <label for="fv-pan">PAN</label>
+                    <input type="text" id="fv-pan" maxlength="10" placeholder="e.g. ABCDE1234F" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '')" style="text-transform: uppercase;">
+                </div>
+                <div class="span-2">
+                    <label for="fv-contact">Contact Person</label>
+                    <input type="text" id="fv-contact" maxlength="80" placeholder="Optional">
+                </div>
+                <div class="span-2">
+                    <label for="fv-phone">Phone</label>
+                    <input type="tel" id="fv-phone" maxlength="20" placeholder="Optional">
+                </div>
+                <div class="span-2">
+                    <label for="fv-email">Email</label>
+                    <input type="email" id="fv-email" maxlength="120" placeholder="Optional">
+                </div>
+                <div class="span-2">
+                    <label for="fv-type">What they supply</label>
+                    <input type="text" id="fv-type" maxlength="80" placeholder="e.g. Fabrication, Printing, CA">
+                </div>
+                <div class="full-width">
+                    <label for="fv-address">Address</label>
+                    <textarea id="fv-address" rows="2" maxlength="400" placeholder="Optional"></textarea>
+                </div>
+                <div class="full-width">
+                    <label for="fv-notes">Notes</label>
+                    <textarea id="fv-notes" rows="2" maxlength="1000" placeholder="Bank details, payment terms, anything useful"></textarea>
+                </div>
+                <div class="full-width fin-modal-actions">
+                    <button type="button" class="btn-primary fin-btn-secondary" onclick="hvFinCloseVendorModal()">Cancel</button>
+                    <button type="button" class="btn-primary fin-btn-danger" id="fvDeleteBtn" onclick="hvFinDeleteVendor()">Delete</button>
+                    <button type="submit" class="btn-primary" style="flex: 2;">Save Vendor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <style>
         /* ===== Finance section ===== */
         body.finance-mode .leads-only { display: none !important; }
@@ -5457,6 +5572,49 @@
         .fin-history-title { font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
         .fin-history-row { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; padding: 4px 0; border-bottom: 1px dashed var(--border-color); }
         .fin-history-row span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ----- Vendors ----- */
+        .fin-vendor-pick { display: flex; gap: 6px; align-items: stretch; }
+        .fin-vendor-pick select { flex: 1; min-width: 0; }
+        .fin-mini-btn { flex: none; border: 1px solid var(--border-color); background: var(--history-item-bg); color: var(--text-main); border-radius: 8px; padding: 0 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .fin-mini-btn:hover { border-color: #6366f1; color: #6366f1; }
+        .fin-vendor-hint { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; min-height: 0; line-height: 1.4; }
+        .fin-vendor-hint a { color: #6366f1; font-weight: 600; cursor: pointer; }
+        .fin-vendor-hint.warn { color: #b45309; }
+        .fin-vendor-box { background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 10px; }
+        .fin-box-heading-vendor { color: #6366f1; }
+        .fin-paykind { display: flex; flex-wrap: wrap; gap: 6px; }
+        .fin-paykind-opt { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); cursor: pointer; text-transform: none !important; letter-spacing: normal !important; font-size: 0.74rem !important; font-weight: 600; color: var(--text-main) !important; }
+        .fin-paykind-opt input { width: auto; height: auto; margin: 0; }
+        .fin-paykind-opt:has(input:checked) { border-color: #6366f1; background: rgba(99, 102, 241, 0.12); }
+        .fin-kind-badge { display: inline-block; font-size: 0.62rem; font-weight: 700; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+        .fin-kind-badge.adv { color: #7c3aed; background: rgba(124, 58, 237, 0.12); border: 1px solid rgba(124, 58, 237, 0.35); }
+        .fin-vlink { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; cursor: pointer; }
+        .fin-vlink:hover { color: #6366f1; }
+
+        .fin-vtable td, .fin-vtable th { font-size: 0.74rem; padding: 6px 8px; }
+        .fin-vtable td.num, .fin-vtable th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .fin-vtable tr.fin-vrow { cursor: pointer; }
+        .fin-vtable tr.fin-vtotal td { font-weight: 700; border-top: 2px solid var(--border-color); }
+        .fin-vname { font-weight: 700; }
+        .fin-vsub { display: block; font-size: 0.66rem; color: var(--text-muted); font-weight: 400; }
+        .fin-vhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 30px; }
+        .fin-vhead h2 { margin: 0; font-size: 1.1rem; flex: 1; min-width: 180px; }
+        .fin-vhead input { height: 32px; width: 200px; font-size: 0.75rem; padding: 0 8px; }
+        .fin-vdetails { font-size: 0.72rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 8px; }
+        .fin-vdetails strong { color: var(--text-main); }
+        .fin-vsection { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 12px 0 4px; }
+        .fin-bal-due { color: #dc2626; font-weight: 700; }
+        .fin-bal-ok { color: #059669; font-weight: 700; }
+        .fin-back { background: none; border: none; color: #6366f1; font-weight: 700; cursor: pointer; font-size: 0.78rem; padding: 0; font-family: inherit; }
+        #finTxnModal { z-index: 1050; }
+        /* finance windows grow with their content; the dark backdrop scrolls instead of the box being cut short */
+        #finTxnModal .modal-content, #finVendorModal .modal-content, #finVendorsModal .modal-content { max-height: none; margin-bottom: 4vh; }
+        #finVendorModal { z-index: 1100; }
+        @media (max-width: 640px) {
+            .fin-vhead input { width: 100%; }
+            .fin-paykind-opt { flex: 1 1 100%; }
+        }
     </style>
 
     <script>
@@ -5505,10 +5663,26 @@
         'Inter-account Transfer',
         'Other Expense'
     ];
+    /* Debits that are NOT paid to a vendor: no vendor box for these. Every other debit category gets the vendor picker. */
+    const FIN_NON_VENDOR_DEBITS = [
+        'Salaries & Wages',
+        'GST Payment',
+        'TDS Payment',
+        'Other Taxes & Fees',
+        'Bank Charges',
+        'Loan Repayment / EMI',
+        'Owner / Director Drawings',
+        'Refund to Customer',
+        'Reverse Entry / Reversal',
+        'Inter-account Transfer'
+    ];
+    /* For these, a missing vendor is flagged in the list and the form opens when the category is picked. */
+    const FIN_VENDOR_REQUIRED = ['Vendor / Contractor Payment', 'Purchases / Inventory', 'Professional Fees (CA / Legal)'];
 
     (function () {
         const TX_KEY = 'hvFinanceTxns';
         const IMP_KEY = 'hvFinanceImports';
+        const VEN_KEY = 'hvFinanceVendors';
         const UI_KEY = 'hvFinanceUI';
         const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
         const $ = id => document.getElementById(id);
@@ -5519,6 +5693,11 @@
         let imports = [];
         try { txns = JSON.parse(localStorage.getItem(TX_KEY) || '[]'); if (!Array.isArray(txns)) txns = []; } catch (e) { txns = []; }
         try { imports = JSON.parse(localStorage.getItem(IMP_KEY) || '[]'); if (!Array.isArray(imports)) imports = []; } catch (e) { imports = []; }
+        let vendors = [];   /* [{ id, name, gstin, pan, contactPerson, phone, email, supplies, address, notes, createdAt, updatedAt }] */
+        try { vendors = JSON.parse(localStorage.getItem(VEN_KEY) || '[]'); if (!Array.isArray(vendors)) vendors = []; } catch (e) { vendors = []; }
+        function saveVendors() {
+            try { localStorage.setItem(VEN_KEY, JSON.stringify(vendors)); } catch (e) { alert('Could not save vendors: ' + e.message); }
+        }
 
         let ui = { view: 'all', period: 'all', sortAsc: false };
         try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch (e) {}
@@ -5758,13 +5937,16 @@
             const q = ($('finSearch').value || '').trim().toLowerCase();
             const acct = $('finAccountFilter').value || '';
             const cat = $('finCategoryFilter').value || '';
+            const ven = $('finVendorFilter').value || '';
             return txns.filter(t => {
                 if (range && (t.date < range[0] || t.date > range[1])) return false;
                 if (acct && (t.account || '') !== acct) return false;
                 if (cat === '__uncat') { if (!isUncat(t)) return false; }
                 else if (cat && t.category !== cat) return false;
+                if (ven && t.vendorId !== ven) return false;
                 if (q) {
-                    const hay = [t.refNo, t.narration, t.party, t.invoiceNo, t.billNo, t.comments, t.category, t.account, String(t.amount)].join(' ').toLowerCase();
+                    const v = t.vendorId ? vendorById(t.vendorId) : null;
+                    const hay = [t.refNo, t.narration, t.party, t.invoiceNo, t.billNo, t.comments, t.category, t.account, String(t.amount), v ? v.name + ' ' + (v.gstin || '') : ''].join(' ').toLowerCase();
                     if (!hay.includes(q)) return false;
                 }
                 return true;
@@ -5775,6 +5957,52 @@
             if (view === 'credit') return t.type === 'Credit';
             if (view === 'debit') return t.type === 'Debit';
             return true;
+        }
+
+        /* ---------- vendors: helpers + running totals ---------- */
+        const isVendorCat = (type, cat) => type === 'Debit' && !!cat && !FIN_NON_VENDOR_DEBITS.includes(cat);
+        const vendorById = id => (id ? vendors.find(v => v.id === id) : null) || null;
+        const vendorByName = name => { const n = norm(name); return n ? vendors.find(v => norm(v.name) === n) || null : null; };
+        const sortedVendors = () => vendors.slice().sort((a, b) => a.name.localeCompare(b.name));
+        const num = v => Number(v || 0);
+        const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+        /* Everything paid to one vendor, grouped by invoice.
+           A payment "against invoice" settles: bank amount + TDS deducted + advance adjusted.
+           Several payments with the same invoice no. count as part payments of one invoice. */
+        function vendorStats(vid, skipId) {
+            const pays = txns.filter(t => t.vendorId === vid && t.type === 'Debit' && t.id !== skipId);
+            let paid = 0, tds = 0, advPaid = 0, advAdj = 0, last = '';
+            const invMap = new Map();
+            pays.forEach(t => {
+                const amt = num(t.amount);
+                paid += amt;
+                if (t.date > last) last = t.date;
+                if (t.payKind === 'advance') { advPaid += amt; return; }
+                tds += num(t.billTds); advAdj += num(t.advAdjusted);
+                const key = t.billNo ? norm(t.billNo) : '_' + t.id;
+                let inv = invMap.get(key);
+                if (!inv) { inv = { no: t.billNo || '', date: '', amount: null, gst: null, paid: 0, tds: 0, adv: 0, txns: [] }; invMap.set(key, inv); }
+                if (t.billAmount != null && t.billAmount !== '') inv.amount = Math.max(inv.amount || 0, num(t.billAmount));
+                if (t.billGst != null && t.billGst !== '') inv.gst = Math.max(inv.gst || 0, num(t.billGst));
+                if (t.billDate && (!inv.date || t.billDate < inv.date)) inv.date = t.billDate;
+                inv.paid += amt; inv.tds += num(t.billTds); inv.adv += num(t.advAdjusted);
+                inv.txns.push(t);
+            });
+            const invoices = [...invMap.values()].map(inv => Object.assign(inv, {
+                paid: round2(inv.paid), tds: round2(inv.tds), adv: round2(inv.adv),
+                balance: inv.amount == null ? null : round2(inv.amount - inv.paid - inv.tds - inv.adv)
+            })).sort((a, b) => (b.date || (b.txns[0] && b.txns[0].date) || '').localeCompare(a.date || (a.txns[0] && a.txns[0].date) || ''));
+            const invoiced = round2(invoices.reduce((s, i) => s + (i.amount || 0), 0));
+            const gst = round2(invoices.reduce((s, i) => s + (i.gst || 0), 0));
+            const due = round2(invoices.reduce((s, i) => s + (i.balance > 0.009 ? i.balance : 0), 0));
+            return { pays, count: pays.length, paid: round2(paid), tds: round2(tds), advPaid: round2(advPaid), advAdj: round2(advAdj),
+                advOpen: round2(advPaid - advAdj), invoices, invoiced, gst, due, last };
+        }
+        function vendorOptions(selectedId) {
+            return '<option value="">— Select vendor —</option>'
+                + sortedVendors().map(v => `<option value="${esc(v.id)}"${v.id === selectedId ? ' selected' : ''}>${esc(v.name)}${v.gstin ? ' · ' + esc(v.gstin) : ''}</option>`).join('')
+                + '<option value="__new">➕ Add new vendor…</option>';
         }
 
         /* ---------- dropdown contents ---------- */
@@ -5805,6 +6033,12 @@
             catSel.value = curCat;
             if (catSel.value !== curCat) catSel.value = '';
 
+            const venSel = $('finVendorFilter');
+            const curVen = venSel.value;
+            venSel.innerHTML = '<option value="">All vendors</option>' + sortedVendors().map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
+            venSel.value = vendorById(curVen) ? curVen : '';
+            $('finVendorFilterWrap').style.display = vendors.length ? '' : 'none';
+
             const parties = new Set(txns.map(t => t.party).filter(Boolean));
             try { (typeof leads !== 'undefined' ? leads : []).forEach(l => { if (l && l.company) parties.add(String(l.company).trim()); }); } catch (e) {}
             $('finPartyList').innerHTML = [...parties].sort((a, b) => a.localeCompare(b)).map(p => `<option value="${esc(p)}">`).join('');
@@ -5831,6 +6065,17 @@
                 <span class="fin-chip debit">Debits <strong>${money(dr)}</strong> (${debits.length})</span>
                 <span class="fin-chip">Net <strong style="color:${cr - dr >= 0 ? '#059669' : '#dc2626'}">${cr - dr < 0 ? '−' : ''}${money(Math.abs(cr - dr))}</strong></span>
                 ${uncat ? `<span class="fin-chip warn">To categorise <strong>${uncat}</strong></span>` : (base.length ? '<span class="fin-chip credit"><strong>✓ All categorised</strong></span>' : '')}` : '';
+            const fv = vendorById($('finVendorFilter').value);
+            if (fv) {
+                const st = vendorStats(fv.id);   /* all-time figures for the vendor, whatever the period */
+                $('finSummary').innerHTML += `
+                <span class="fin-chip" style="border-color:#6366f1;">🏢 <strong>${esc(fv.name)}</strong> (all time)</span>
+                <span class="fin-chip">Paid <strong>${money(st.paid)}</strong></span>
+                <span class="fin-chip">TDS <strong>${money(st.tds)}</strong></span>
+                ${st.advOpen > 0.009 ? `<span class="fin-chip warn">Advance not adjusted <strong>${money(st.advOpen)}</strong></span>` : ''}
+                ${st.due > 0.009 ? `<span class="fin-chip debit">Invoice balance due <strong>${money(st.due)}</strong></span>` : ''}
+                <a href="#" class="fin-chip" style="color:#6366f1;text-decoration:none;" onclick="event.preventDefault(); hvFinOpenVendors('${fv.id}')">📒 Open ledger</a>`;
+            }
 
             const showAcct = txns.some(t => t.account);
             $('finHeadRow').innerHTML = `
@@ -5862,8 +6107,22 @@
             }
             body.innerHTML = rows.map((t, i) => {
                 const isCr = t.type === 'Credit';
-                let partyHtml = t.party ? `<span class="fin-party">${esc(t.party)}</span>` : '';
-                if (t.category === 'Sales') {
+                const ven = vendorById(t.vendorId);
+                let partyHtml = ven
+                    ? `<span class="fin-party"><a class="fin-vlink" onclick="event.stopPropagation(); hvFinOpenVendors('${ven.id}')" title="Open this vendor's ledger">🏢 ${esc(ven.name)}</a></span>`
+                    : (t.party ? `<span class="fin-party">${esc(t.party)}</span>` : '');
+                if (!isCr && isVendorCat(t.type, t.category) && ven) {
+                    if (t.payKind === 'advance') partyHtml += ` <span class="fin-kind-badge adv" title="Advance, to be adjusted against a future invoice">Advance</span>`;
+                    else if (t.billNo) {
+                        const bits = ['Inv ' + esc(t.billNo)];
+                        if (t.billDate) bits.push(esc(fmtDate(t.billDate)));
+                        if (num(t.billTds)) bits.push('TDS ' + money(t.billTds));
+                        if (num(t.advAdjusted)) bits.push('Adv adj ' + money(t.advAdjusted));
+                        partyHtml += `<span class="fin-inv">${bits.join(' · ')}</span>`;
+                    } else partyHtml += ` <span class="fin-warn-badge" title="Open the transaction to add the vendor's invoice details">⚠ Invoice details missing</span>`;
+                } else if (!isCr && FIN_VENDOR_REQUIRED.includes(t.category) && !ven) {
+                    partyHtml += ` <span class="fin-warn-badge" title="Open the transaction to pick the vendor">⚠ Vendor not set</span>`;
+                } else if (t.category === 'Sales') {
                     partyHtml += t.invoiceNo
                         ? `<span class="fin-inv">Inv ${esc(t.invoiceNo)}${t.invoiceDate ? ' · ' + esc(fmtDate(t.invoiceDate)) : ''}</span>`
                         : ` <span class="fin-warn-badge" title="Open the transaction to add invoice details">⚠ Invoice details missing</span>`;
@@ -5905,6 +6164,7 @@
             t.updatedAt = new Date().toISOString();
             save();
             if (value === 'Sales' && !t.invoiceNo) { hvRenderFinance(); hvFinOpenTxnModal(id, true); return; }
+            if (t.type === 'Debit' && FIN_VENDOR_REQUIRED.includes(value) && !vendorById(t.vendorId)) { hvRenderFinance(); hvFinOpenTxnModal(id, 'vendor'); return; }
             hvRenderFinance();
         };
 
@@ -5930,11 +6190,96 @@
             hvFinCategoryChanged();
         };
         window.hvFinCategoryChanged = function () {
-            const isSales = $('fin-type').value === 'Credit' && $('fin-category').value === 'Sales';
+            const type = $('fin-type').value;
+            const isSales = type === 'Credit' && $('fin-category').value === 'Sales';
+            const vendorMode = isVendorCat(type, $('fin-category').value);
             $('finSalesBox').style.display = isSales ? '' : 'none';
-            $('finBillWrap').style.display = $('fin-type').value === 'Debit' ? '' : 'none';
-            $('fin-party').placeholder = isSales ? 'Customer name' : ($('fin-type').value === 'Credit' ? 'Who paid' : 'Vendor / payee');
+            $('finBillWrap').style.display = type === 'Debit' && !vendorMode ? '' : 'none';
+            $('finPartyWrap').style.display = vendorMode ? 'none' : '';
+            $('finVendorWrap').style.display = vendorMode ? '' : 'none';
+            $('finVendorBox').style.display = vendorMode ? '' : 'none';
+            $('fin-party').placeholder = isSales ? 'Customer name' : (type === 'Credit' ? 'Who paid' : 'Payee');
             hvFinUpdateRecon();
+            if (vendorMode) hvFinVendorPicked();
+        };
+
+        /* ---------- vendor part of the transaction form ---------- */
+        let lastVendorPick = '';
+        const payKind = () => { const r = document.querySelector('input[name="fin-paykind"]:checked'); return r ? r.value : 'invoice'; };
+        function setPayKind(k) { document.querySelectorAll('input[name="fin-paykind"]').forEach(r => { r.checked = r.value === (k === 'advance' ? 'advance' : 'invoice'); }); }
+
+        window.hvFinVendorPicked = function () {
+            const sel = $('fin-vendor');
+            if (sel.value === '__new') {
+                sel.value = lastVendorPick;
+                hvFinOpenVendorModal(null, 'txn', vendorById(lastVendorPick) ? '' : $('fin-party').value.trim());
+                return;
+            }
+            lastVendorPick = sel.value;
+            const v = vendorById(sel.value);
+            const hint = $('finVendorHint');
+            hint.className = 'fin-vendor-hint';
+            if (v) {
+                const st = vendorStats(v.id, editingId);
+                const bits = [];
+                if (v.gstin) bits.push('GSTIN ' + esc(v.gstin));
+                if (st.count) bits.push(`${st.count} earlier payment${st.count === 1 ? '' : 's'}, ${money(st.paid)}`);
+                if (st.advOpen > 0.009) bits.push(`<strong style="color:#b45309">advance not yet adjusted ${money(st.advOpen)}</strong>`);
+                hint.innerHTML = bits.join(' · ') + ` · <a onclick="hvFinOpenVendorModal('${v.id}', 'txn')">Edit vendor</a>`;
+            } else {
+                const typed = $('fin-party').value.trim();
+                if (typed) { hint.className = 'fin-vendor-hint warn'; hint.innerHTML = `Paid to (as typed earlier): “${esc(typed)}”. <a onclick="hvFinOpenVendorModal(null, 'txn', document.getElementById('fin-party').value.trim())">Add as vendor</a>`; }
+                else hint.innerHTML = 'Pick from the list, or choose “➕ Add new vendor…”.';
+            }
+            hvFinPayKindChanged();
+        };
+        window.hvFinPayKindChanged = function () {
+            const adv = payKind() === 'advance';
+            $('finVinvGrid').style.display = adv ? 'none' : '';
+            const note = $('finAdvanceNote');
+            note.style.display = adv ? '' : 'none';
+            if (adv) {
+                const v = vendorById($('fin-vendor').value);
+                const st = v ? vendorStats(v.id, editingId) : null;
+                note.className = 'fin-recon';
+                note.innerHTML = `This payment is kept as an advance${v ? ' with <strong>' + esc(v.name) + '</strong>' : ''}. When their invoice comes, record that payment as <strong>Against invoice</strong> and put the advance used under <strong>Advance Adjusted</strong>.`
+                    + (st && st.advOpen > 0.009 ? `<br>Advance already with this vendor, not yet adjusted: <strong>${money(st.advOpen)}</strong>.` : '');
+            }
+            hvFinUpdateVendorRecon();
+        };
+        window.hvFinUpdateVendorRecon = function () {
+            const el = $('finVendorRecon');
+            el.className = 'full-width fin-recon';
+            if (payKind() === 'advance') { el.textContent = ''; return; }
+            const v = vendorById($('fin-vendor').value);
+            const inv = amtVal('fin-vinv-amount');
+            const paid = amtVal('fin-amount') || 0, tds = amtVal('fin-vinv-tds') || 0, adv = amtVal('fin-vinv-adv') || 0;
+            const msgs = [];
+            let others = null;
+            const invNo = norm($('fin-vinv-no').value);
+            if (v && invNo) {
+                others = vendorStats(v.id, editingId).invoices.find(i => norm(i.no) === invNo) || null;
+            }
+            const otherTotal = others ? round2(others.paid + others.tds + others.adv) : 0;
+            const parts = [`Paid ${money(paid)}`];
+            if (tds) parts.push(`TDS ${money(tds)}`);
+            if (adv) parts.push(`advance ${money(adv)}`);
+            if (otherTotal) parts.push(`earlier payments on this invoice ${money(otherTotal)}`);
+            let cls = '';
+            if (inv) {
+                const gap = round2(inv - paid - tds - adv - otherTotal);
+                if (Math.abs(gap) < 0.01) { msgs.push(`✓ ${parts.join(' + ')} settles the invoice of ${money(inv)}.`); cls = 'ok'; }
+                else if (gap > 0) { msgs.push(`${parts.join(' + ')} leaves ${money(gap)} still to pay on this invoice.`); cls = 'gap'; }
+                else { msgs.push(`${parts.join(' + ')} is ${money(-gap)} more than the invoice amount.`); cls = 'gap'; }
+            } else if (otherTotal) {
+                msgs.push(`This invoice already has ${others.txns.length} payment${others.txns.length === 1 ? '' : 's'} (${money(otherTotal)} incl. TDS / advance).`);
+            }
+            if (adv && v) {
+                const open = vendorStats(v.id, editingId).advOpen;
+                if (adv - open > 0.009) { msgs.push(`⚠ Only ${money(Math.max(open, 0))} of advance is open with this vendor.`); cls = 'gap'; }
+            }
+            el.innerHTML = msgs.map(esc).join('<br>');
+            if (cls) el.className = 'full-width fin-recon ' + cls;
         };
         window.hvFinUpdateRecon = function () {
             const el = $('finRecon');
@@ -5977,37 +6322,70 @@
             $('fin-inv-tds').value = t ? amtStr(t.tdsAmount) : '';
             $('fin-bill-no').value = t ? (t.billNo || '') : '';
             $('fin-comments').value = t ? (t.comments || '') : '';
+            /* vendor payment fields */
+            const preVendor = t ? (vendorById(t.vendorId) || (t.type === 'Debit' ? vendorByName(t.party) : null)) : null;
+            lastVendorPick = preVendor ? preVendor.id : '';
+            $('fin-vendor').innerHTML = vendorOptions(lastVendorPick);
+            setPayKind(t ? t.payKind : 'invoice');
+            $('fin-vinv-no').value = t ? (t.billNo || '') : '';
+            $('fin-vinv-date').value = t ? (t.billDate || '') : '';
+            $('fin-vinv-amount').value = t ? amtStr(t.billAmount) : '';
+            $('fin-vinv-gst').value = t ? amtStr(t.billGst) : '';
+            $('fin-vinv-tds').value = t ? amtStr(t.billTds) : '';
+            $('fin-vinv-adv').value = t ? amtStr(t.advAdjusted) : '';
             hvFinTypeChanged();
             if (t) $('fin-category').value = t.category || '';
             hvFinCategoryChanged();
             $('finDeleteBtn').style.display = t ? '' : 'none';
             $('finSaveNextBtn').style.display = (t && nextUncatId(t.id)) ? '' : 'none';
             $('finTxnModal').style.display = 'block';
-            setTimeout(() => { (focusInvoice ? $('fin-inv-no') : (t ? $('fin-category') : $('fin-amount'))).focus(); }, 30);
+            setTimeout(() => { (focusInvoice === 'vendor' ? $('fin-vendor') : focusInvoice ? $('fin-inv-no') : (t ? $('fin-category') : $('fin-amount'))).focus(); }, 30);
         };
         window.hvFinCloseTxnModal = function () { $('finTxnModal').style.display = 'none'; editingId = null; };
 
         window.hvFinSaveTxn = function (goNext) {
             const date = $('fin-date').value;
             const amount = amtVal('fin-amount');
-            if (!date) { alert('Please enter the transaction date.'); return; }
-            if (!amount) { alert('Please enter an amount greater than zero.'); return; }
             const type = $('fin-type').value;
             const category = $('fin-category').value;
             const isSales = type === 'Credit' && category === 'Sales';
+            const vendorMode = isVendorCat(type, category);
+            const vendor = vendorMode ? vendorById($('fin-vendor').value) : null;
+            const kind = vendorMode ? payKind() : '';
+            const onInvoice = vendorMode && kind === 'invoice';
+            const advAdjusted = onInvoice ? amtVal('fin-vinv-adv') : null;
+            if (!date) { alert('Please enter the transaction date.'); return; }
+            /* ₹0 is allowed only for an invoice settled fully from an earlier advance (no money left the bank) */
+            if (!amount && !(onInvoice && advAdjusted > 0 && amount === 0)) {
+                alert(onInvoice ? 'Please enter the amount paid. (If the invoice was settled fully from an earlier advance, enter 0 and fill in Advance Adjusted.)' : 'Please enter an amount greater than zero.');
+                return;
+            }
+            if (vendorMode && kind === 'advance' && !vendor) { alert('Please pick the vendor this advance was paid to, so it can be adjusted against their invoices later.'); $('fin-vendor').focus(); return; }
+            if (onInvoice && advAdjusted > 0) {
+                if (!vendor) { alert('Please pick the vendor whose advance is being adjusted.'); $('fin-vendor').focus(); return; }
+                const open = vendorStats(vendor.id, editingId).advOpen;
+                if (advAdjusted - open > 0.009 && !confirm(`Advance Adjusted is ${money(advAdjusted)}, but only ${money(Math.max(open, 0))} of advance is open with ${vendor.name}.\n\nSave anyway?`)) return;
+            }
             const fields = {
-                date, type, amount,
+                date, type, amount: amount || 0,
                 refNo: $('fin-ref').value.trim(),
                 account: $('fin-account').value.trim(),
                 narration: $('fin-narration').value.trim(),
                 category,
-                party: $('fin-party').value.trim(),
+                party: vendor ? vendor.name : $('fin-party').value.trim(),
                 invoiceNo: isSales ? $('fin-inv-no').value.trim() : '',
                 invoiceDate: isSales ? $('fin-inv-date').value : '',
                 invoiceAmount: isSales ? amtVal('fin-inv-amount') : null,
                 gstAmount: isSales ? amtVal('fin-inv-gst') : null,
                 tdsAmount: isSales ? amtVal('fin-inv-tds') : null,
-                billNo: type === 'Debit' ? $('fin-bill-no').value.trim() : '',
+                billNo: type !== 'Debit' ? '' : (vendorMode ? (onInvoice ? $('fin-vinv-no').value.trim() : '') : $('fin-bill-no').value.trim()),
+                vendorId: vendor ? vendor.id : '',
+                payKind: vendorMode ? kind : '',
+                billDate: onInvoice ? $('fin-vinv-date').value : '',
+                billAmount: onInvoice ? amtVal('fin-vinv-amount') : null,
+                billGst: onInvoice ? amtVal('fin-vinv-gst') : null,
+                billTds: onInvoice ? amtVal('fin-vinv-tds') : null,
+                advAdjusted,
                 comments: $('fin-comments').value.trim(),
                 updatedAt: new Date().toISOString()
             };
@@ -6023,6 +6401,7 @@
             const nextId = goNext ? nextUncatId(savedId) : null;
             hvFinCloseTxnModal();
             hvRenderFinance();
+            refreshVendorsWindow();
             if (nextId) hvFinOpenTxnModal(nextId);
         };
 
@@ -6035,6 +6414,238 @@
             save();
             if ($('finTxnModal').style.display === 'block') hvFinCloseTxnModal();
             hvRenderFinance();
+            refreshVendorsWindow();
+        };
+
+        /* ---------- vendors: add / edit ---------- */
+        let vendorEditId = null, vendorFrom = '';
+        window.hvFinOpenVendorModal = function (id, from, prefillName) {
+            const v = vendorById(id);
+            vendorEditId = v ? v.id : null;
+            vendorFrom = from || '';
+            $('finVendorForm').reset();
+            $('finVendorTitle').textContent = v ? 'Edit Vendor' : 'Add Vendor';
+            $('fv-name').value = v ? v.name : (prefillName || '');
+            $('fv-gstin').value = v ? (v.gstin || '') : '';
+            $('fv-pan').value = v ? (v.pan || '') : '';
+            $('fv-contact').value = v ? (v.contactPerson || '') : '';
+            $('fv-phone').value = v ? (v.phone || '') : '';
+            $('fv-email').value = v ? (v.email || '') : '';
+            $('fv-type').value = v ? (v.supplies || '') : '';
+            $('fv-address').value = v ? (v.address || '') : '';
+            $('fv-notes').value = v ? (v.notes || '') : '';
+            hvFinGstinInput($('fv-gstin'), true);
+            $('fvDeleteBtn').style.display = v ? '' : 'none';
+            $('finVendorModal').style.display = 'block';
+            setTimeout(() => $(v || prefillName ? 'fv-gstin' : 'fv-name').focus(), 30);
+        };
+        window.hvFinCloseVendorModal = function () { $('finVendorModal').style.display = 'none'; vendorEditId = null; };
+        window.hvFinGstinInput = function (el, quiet) {
+            el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+            const g = el.value, hint = $('fvGstinHint');
+            hint.className = 'fin-vendor-hint';
+            if (!g) { hint.textContent = ''; return; }
+            if (g.length < 15) { hint.textContent = quiet ? '' : `${g.length} of 15 characters`; return; }
+            if (GSTIN_RE.test(g)) {
+                const pan = g.slice(2, 12);
+                if (!$('fv-pan').value) $('fv-pan').value = pan;
+                hint.textContent = '✓ Format looks right · PAN ' + pan;
+            } else { hint.className = 'fin-vendor-hint warn'; hint.textContent = '⚠ This does not look like a valid GSTIN — please check it.'; }
+        };
+        window.hvFinSaveVendor = function () {
+            const name = $('fv-name').value.trim().replace(/\s+/g, ' ');
+            if (!name) { alert('Please enter the vendor name.'); $('fv-name').focus(); return; }
+            const gstin = $('fv-gstin').value.trim().toUpperCase();
+            const pan = $('fv-pan').value.trim().toUpperCase();
+            const sameName = vendors.find(v => v.id !== vendorEditId && norm(v.name) === norm(name));
+            if (sameName) { alert(`A vendor called "${sameName.name}" already exists. Pick it from the list instead.`); return; }
+            const sameGst = gstin && vendors.find(v => v.id !== vendorEditId && v.gstin === gstin);
+            if (sameGst) { alert(`GSTIN ${gstin} is already saved for "${sameGst.name}".`); return; }
+            if (gstin && !GSTIN_RE.test(gstin) && !confirm(`"${gstin}" does not look like a valid 15-character GSTIN.\n\nSave anyway?`)) return;
+            if (pan && !/^[A-Z]{5}\d{4}[A-Z]$/.test(pan) && !confirm(`"${pan}" does not look like a valid PAN.\n\nSave anyway?`)) return;
+            const now = new Date().toISOString();
+            const fields = {
+                name, gstin, pan,
+                contactPerson: $('fv-contact').value.trim(), phone: $('fv-phone').value.trim(), email: $('fv-email').value.trim(),
+                supplies: $('fv-type').value.trim(), address: $('fv-address').value.trim(), notes: $('fv-notes').value.trim(), updatedAt: now
+            };
+            let v = vendorById(vendorEditId);
+            if (v) {
+                const renamed = v.name !== name;
+                Object.assign(v, fields);
+                if (renamed) {   /* keep the "Paid To" name on its payments in step */
+                    let n = 0;
+                    txns.forEach(t => { if (t.vendorId === v.id && t.party !== name) { t.party = name; n++; } });
+                    if (n) save();
+                }
+            } else {
+                v = Object.assign({ id: newId('ven_'), createdAt: now }, fields);
+                vendors.push(v);
+            }
+            saveVendors();
+            const from = vendorFrom;
+            hvFinCloseVendorModal();
+            if (from === 'txn' && $('finTxnModal').style.display === 'block') {
+                $('fin-vendor').innerHTML = vendorOptions(v.id);
+                hvFinVendorPicked();
+            }
+            hvRenderFinance();
+            refreshVendorsWindow();
+        };
+        window.hvFinDeleteVendor = function () {
+            const v = vendorById(vendorEditId);
+            if (!v) return;
+            const linked = txns.filter(t => t.vendorId === v.id).length;
+            if (linked) { alert(`"${v.name}" has ${linked} payment${linked === 1 ? '' : 's'} linked to it, so it cannot be deleted.\n\nChange the vendor on those payments first if this vendor was added by mistake.`); return; }
+            if (!confirm(`Delete vendor "${v.name}"?`)) return;
+            vendors = vendors.filter(x => x.id !== v.id);
+            saveVendors();
+            hvFinCloseVendorModal();
+            if (venView.id === v.id) venView.id = null;
+            if ($('finTxnModal').style.display === 'block') { $('fin-vendor').innerHTML = vendorOptions(''); hvFinVendorPicked(); }
+            hvRenderFinance();
+            refreshVendorsWindow();
+        };
+
+        /* ---------- vendors: list + ledger window ---------- */
+        const venView = { id: null, q: '' };
+        function refreshVendorsWindow() { if ($('finVendorsModal').style.display === 'block') renderVendors(); }
+        window.hvFinOpenVendors = function (id) {
+            venView.id = vendorById(id) ? id : null;
+            $('finVendorsModal').style.display = 'block';
+            renderVendors();
+        };
+        window.hvFinCloseVendors = function () { $('finVendorsModal').style.display = 'none'; };
+        window.hvFinVendorsBack = function () { venView.id = null; renderVendors(); };
+        window.hvFinVendorsSearch = function (el) { venView.q = el.value; renderVendors(true); };
+        window.hvFinShowVendorInList = function (id) {
+            hvFinCloseVendors();
+            if (window.hvSwitchSection) hvSwitchSection('finance');
+            ui.view = 'all'; ui.period = 'all'; saveUI();
+            $('finPeriod').value = 'all'; $('finCustomRange').style.display = 'none';
+            $('finCategoryFilter').value = ''; $('finSearch').value = '';
+            refreshFilterOptions();
+            $('finVendorFilter').value = id;
+            hvRenderFinance();
+        };
+
+        function renderVendors(keepFocus) {
+            const box = $('finVendorsBody');
+            const v = vendorById(venView.id);
+            if (v) { box.innerHTML = ledgerHtml(v); return; }
+            const q = venView.q.trim().toLowerCase();
+            const rows = sortedVendors().map(x => ({ v: x, st: vendorStats(x.id) }))
+                .filter(r => !q || [r.v.name, r.v.gstin, r.v.pan, r.v.supplies, r.v.contactPerson, r.v.phone].join(' ').toLowerCase().includes(q));
+            const tot = rows.reduce((a, r) => ({ paid: a.paid + r.st.paid, tds: a.tds + r.st.tds, adv: a.adv + Math.max(r.st.advOpen, 0), due: a.due + r.st.due, n: a.n + r.st.count }), { paid: 0, tds: 0, adv: 0, due: 0, n: 0 });
+            const missing = txns.filter(t => t.type === 'Debit' && FIN_VENDOR_REQUIRED.includes(t.category) && !vendorById(t.vendorId)).length;
+            box.innerHTML = `
+                <div class="fin-vhead">
+                    <h2>🏢 Vendors <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">(${vendors.length})</span></h2>
+                    <input type="text" id="finVenSearch" placeholder="🔍 Name, GSTIN, PAN…" value="${esc(venView.q)}" oninput="hvFinVendorsSearch(this)">
+                    <button type="button" class="btn-add-lead" onclick="hvFinOpenVendorModal(null, 'list')">+ Add Vendor</button>
+                </div>
+                ${missing ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${missing} payment${missing === 1 ? '' : 's'} under Vendor / Contractor, Purchases or Professional Fees ${missing === 1 ? 'has' : 'have'} no vendor yet. They are marked “⚠ Vendor not set” in the list.</div>` : ''}
+                ${!vendors.length ? `<div class="fin-empty" style="padding:28px;">No vendors yet. Click <strong>+ Add Vendor</strong>, or pick “➕ Add new vendor…” while categorising a payment.</div>` : `
+                <div class="table-container" style="max-height: 62vh;">
+                    <table class="fin-vtable">
+                        <thead><tr><th>Vendor</th><th>GSTIN</th><th class="num">Payments</th><th class="num">Total Paid</th><th class="num">TDS Deducted</th><th class="num">Advance not adjusted</th><th class="num">Invoice balance due</th><th>Last paid</th></tr></thead>
+                        <tbody>
+                        ${rows.map(({ v, st }) => `<tr class="fin-vrow" onclick="hvFinOpenVendors('${v.id}')">
+                            <td><span class="fin-vname">${esc(v.name)}</span>${v.supplies ? `<span class="fin-vsub">${esc(v.supplies)}</span>` : ''}</td>
+                            <td>${esc(v.gstin) || '<span style="color:var(--text-muted)">—</span>'}</td>
+                            <td class="num">${st.count || ''}</td>
+                            <td class="num">${st.count ? money(st.paid) : ''}</td>
+                            <td class="num">${st.tds ? money(st.tds) : ''}</td>
+                            <td class="num">${st.advOpen > 0.009 ? `<span style="color:#b45309;font-weight:700;">${money(st.advOpen)}</span>` : ''}</td>
+                            <td class="num">${st.due > 0.009 ? `<span class="fin-bal-due">${money(st.due)}</span>` : ''}</td>
+                            <td>${st.last ? esc(fmtDate(st.last)) : ''}</td>
+                        </tr>`).join('') || '<tr><td colspan="8" class="fin-empty">No vendor matches the search.</td></tr>'}
+                        ${rows.length > 1 ? `<tr class="fin-vtotal"><td colspan="2">Total</td><td class="num">${tot.n}</td><td class="num">${money(tot.paid)}</td><td class="num">${money(tot.tds)}</td><td class="num">${money(tot.adv)}</td><td class="num">${money(tot.due)}</td><td></td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>`}`;
+            if (keepFocus) { const s = $('finVenSearch'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
+        }
+
+        function ledgerHtml(v) {
+            const st = vendorStats(v.id);
+            const details = [
+                v.gstin && `GSTIN <strong>${esc(v.gstin)}</strong>`, v.pan && `PAN <strong>${esc(v.pan)}</strong>`,
+                v.supplies && `Supplies: ${esc(v.supplies)}`, v.contactPerson && `Contact: ${esc(v.contactPerson)}`,
+                v.phone && `📞 <a href="tel:${esc(v.phone.replace(/[^\d+]/g, ''))}" style="color:inherit;">${esc(v.phone)}</a>`,
+                v.email && `✉️ <a href="mailto:${esc(v.email)}" style="color:inherit;">${esc(v.email)}</a>`
+            ].filter(Boolean).join(' · ');
+            const pays = st.pays.slice().sort((a, b) => a.date !== b.date ? (a.date < b.date ? 1 : -1) : (b.seq || 0) - (a.seq || 0));
+            const invRows = st.invoices.filter(i => i.no || i.amount != null);
+            const noInv = st.invoices.filter(i => !i.no && i.amount == null).reduce((n, i) => n + i.txns.length, 0);
+            return `
+                <div class="fin-vhead">
+                    <button type="button" class="fin-back" onclick="hvFinVendorsBack()">← All vendors</button>
+                </div>
+                <div class="fin-vhead">
+                    <h2>🏢 ${esc(v.name)}</h2>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenVendorModal('${v.id}', 'ledger')">✏️ Edit vendor</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinShowVendorInList('${v.id}')" title="Show only this vendor's payments in the Finance list">🔎 Show in list</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinExportVendor('${v.id}')">⬇️ Export</button>
+                </div>
+                <div class="fin-vdetails">${details || 'No GSTIN or contact details yet. Click ✏️ Edit vendor to add them.'}
+                    ${v.address ? `<br>${esc(v.address)}` : ''}${v.notes ? `<br><em>${esc(v.notes)}</em>` : ''}</div>
+                <div class="fin-summary">
+                    <span class="fin-chip">Payments <strong>${st.count}</strong></span>
+                    <span class="fin-chip debit">Paid from bank <strong>${money(st.paid)}</strong></span>
+                    <span class="fin-chip">Invoices <strong>${money(st.invoiced)}</strong>${st.gst ? ` (GST ${money(st.gst)})` : ''}</span>
+                    <span class="fin-chip">TDS deducted <strong>${money(st.tds)}</strong></span>
+                    <span class="fin-chip${st.advOpen > 0.009 ? ' warn' : ''}">Advances <strong>${money(st.advPaid)}</strong> · adjusted ${money(st.advAdj)} · open <strong>${money(st.advOpen)}</strong></span>
+                    <span class="fin-chip${st.due > 0.009 ? ' debit' : ' credit'}">Invoice balance due <strong>${money(st.due)}</strong></span>
+                </div>
+
+                <div class="fin-vsection">🧾 Invoices</div>
+                ${invRows.length ? `<div class="table-container" style="max-height: 30vh;"><table class="fin-vtable">
+                    <thead><tr><th>Invoice No</th><th>Invoice Date</th><th class="num">Amount</th><th class="num">GST</th><th class="num">Paid</th><th class="num">TDS</th><th class="num">Advance adj.</th><th class="num">Balance</th></tr></thead>
+                    <tbody>${invRows.map(i => `<tr>
+                        <td>${esc(i.no) || '<span style="color:var(--text-muted)">(no number)</span>'}</td>
+                        <td>${i.date ? esc(fmtDate(i.date)) : ''}</td>
+                        <td class="num">${i.amount != null ? money(i.amount) : '<span style="color:var(--text-muted)">not entered</span>'}</td>
+                        <td class="num">${i.gst ? money(i.gst) : ''}</td>
+                        <td class="num">${money(i.paid)}${i.txns.length > 1 ? ` <span class="fin-vsub">${i.txns.length} payments</span>` : ''}</td>
+                        <td class="num">${i.tds ? money(i.tds) : ''}</td>
+                        <td class="num">${i.adv ? money(i.adv) : ''}</td>
+                        <td class="num">${i.balance == null ? '' : Math.abs(i.balance) < 0.01 ? '<span class="fin-bal-ok">✓ Settled</span>' : i.balance > 0 ? `<span class="fin-bal-due">${money(i.balance)}</span>` : `<span style="color:#b45309;font-weight:700;">${money(-i.balance)} extra</span>`}</td>
+                    </tr>`).join('')}</tbody></table></div>` : '<div class="fin-modal-sub">No invoice details recorded yet.</div>'}
+                ${noInv ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${noInv} payment${noInv === 1 ? '' : 's'} marked “against invoice” ${noInv === 1 ? 'has' : 'have'} no invoice details. Open ${noInv === 1 ? 'it' : 'them'} below to add them.</div>` : ''}
+
+                <div class="fin-vsection">💸 Payments (click one to edit)</div>
+                ${pays.length ? `<div class="table-container" style="max-height: 34vh;"><table class="fin-vtable">
+                    <thead><tr><th>Date</th><th>Ref No</th><th>Type</th><th>Invoice No</th><th>Nature of Expense</th><th class="num">Paid</th><th class="num">TDS</th><th class="num">Advance adj.</th></tr></thead>
+                    <tbody>${pays.map(t => `<tr class="fin-vrow" onclick="hvFinOpenTxnModal('${t.id}')">
+                        <td>${esc(fmtDate(t.date))}</td>
+                        <td class="fin-ref" title="${esc(t.refNo)}">${esc(t.refNo)}</td>
+                        <td>${t.payKind === 'advance' ? '<span class="fin-kind-badge adv" style="margin:0;">Advance</span>' : 'Invoice'}</td>
+                        <td>${esc(t.billNo)}</td>
+                        <td style="font-size:0.7rem;">${esc(t.category)}</td>
+                        <td class="num">${money(t.amount)}</td>
+                        <td class="num">${num(t.billTds) ? money(t.billTds) : ''}</td>
+                        <td class="num">${num(t.advAdjusted) ? money(t.advAdjusted) : ''}</td>
+                    </tr>`).join('')}</tbody></table></div>` : '<div class="fin-modal-sub">No payments linked to this vendor yet. Open a debit in the Finance list, pick a category like “Vendor / Contractor Payment”, then choose this vendor.</div>'}`;
+        }
+
+        window.hvFinExportVendor = function (id) {
+            const v = vendorById(id);
+            if (!v) return;
+            const st = vendorStats(id);
+            const cell = x => { x = x === null || x === undefined ? '' : String(x); return /[",\n\r]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+            const head = ['Payment Date', 'Ref No', 'Payment Type', 'Vendor Invoice No', 'Invoice Date', 'Invoice Amount', 'GST in Invoice', 'Paid from Bank', 'TDS Deducted', 'Advance Adjusted', 'Nature of Expense', 'Bank Account', 'Narration', 'Comments'];
+            const lines = [
+                cell('Vendor: ' + v.name) + (v.gstin ? ',' + cell('GSTIN ' + v.gstin) : '') + (v.pan ? ',' + cell('PAN ' + v.pan) : ''),
+                ['Paid ' + st.paid.toFixed(2), 'TDS ' + st.tds.toFixed(2), 'Advance open ' + st.advOpen.toFixed(2), 'Invoice balance due ' + st.due.toFixed(2)].map(cell).join(','),
+                '',
+                head.join(',')
+            ].concat(st.pays.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).map(t => [
+                t.date, t.refNo, t.payKind === 'advance' ? 'Advance' : 'Against invoice', t.billNo, t.billDate,
+                t.billAmount == null ? '' : t.billAmount, t.billGst == null ? '' : t.billGst, num(t.amount).toFixed(2),
+                t.billTds == null ? '' : t.billTds, t.advAdjusted == null ? '' : t.advAdjusted, t.category, t.account, t.narration, t.comments
+            ].map(cell).join(',')));
+            hvDownload(`HV_Vendor_${v.name.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
         };
 
         /* ---------- import ---------- */
@@ -6191,10 +6802,10 @@
 
         window.hvFinClearAll = function () {
             if (!txns.length && !imports.length) { alert('There is no finance data to delete.'); return; }
-            if (!confirm(`Delete ALL finance data?\n\nThis removes ${txns.length} transaction${txns.length === 1 ? '' : 's'} and ${imports.length} import record${imports.length === 1 ? '' : 's'}.\nLeads, tasks and notes are NOT affected.\n\nA safety backup of everything downloads first.`)) return;
+            if (!confirm(`Delete ALL finance data?\n\nThis removes ${txns.length} transaction${txns.length === 1 ? '' : 's'}, ${imports.length} import record${imports.length === 1 ? '' : 's'} and ${vendors.length} vendor${vendors.length === 1 ? '' : 's'}.\nLeads, tasks and notes are NOT affected.\n\nA safety backup of everything downloads first.`)) return;
             if (typeof backupLeadsJSON === 'function') backupLeadsJSON('HV_Backup_BeforeFinanceClear');
-            txns = []; imports = [];
-            save();
+            txns = []; imports = []; vendors = [];
+            save(); saveVendors();
             ui.view = 'all'; saveUI();
             renderImportHistory();
             hvRenderFinance();
@@ -6215,23 +6826,27 @@
         window.hvFinExportCSV = function () {
             const base = baseFiltered().filter(t => inView(t, ui.view)).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.seq || 0) - (b.seq || 0));
             if (!base.length) { alert('No transactions to export for the current filters.'); return; }
-            const head = ['Transaction Date', 'Ref No', 'Narration', 'Bank Account', 'Credit/Debit', 'Amount', 'Credit', 'Debit', 'Source / Nature of Expense', 'Party', 'Invoice No', 'Invoice Date', 'Invoice Amount', 'GST Amount', 'TDS Deducted', 'Vendor Bill No', 'Comments', 'Month', 'FY Quarter', 'Financial Year'];
+            const head = ['Transaction Date', 'Ref No', 'Narration', 'Bank Account', 'Credit/Debit', 'Amount', 'Credit', 'Debit', 'Source / Nature of Expense', 'Party', 'Invoice No', 'Invoice Date', 'Invoice Amount', 'GST Amount', 'TDS Deducted', 'Vendor Bill No', 'Vendor', 'Vendor GSTIN', 'Vendor Payment Type', 'Vendor Invoice Date', 'Vendor Invoice Amount', 'GST in Vendor Invoice', 'TDS on Vendor Payment', 'Advance Adjusted', 'Comments', 'Month', 'FY Quarter', 'Financial Year'];
             const cell = v => { v = v === null || v === undefined ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
             const lines = [head.join(',')].concat(base.map(t => [
                 t.date, t.refNo, t.narration, t.account, t.type, t.amount.toFixed(2),
                 t.type === 'Credit' ? t.amount.toFixed(2) : '', t.type === 'Debit' ? t.amount.toFixed(2) : '',
                 t.category, t.party, t.invoiceNo, t.invoiceDate, t.invoiceAmount == null ? '' : t.invoiceAmount, t.gstAmount == null ? '' : t.gstAmount, t.tdsAmount == null ? '' : t.tdsAmount,
-                t.billNo, t.comments, t.date.slice(0, 7), fyQuarterOf(t.date), fyOf(t.date)
+                t.billNo, ...(() => { const v = vendorById(t.vendorId); return [v ? v.name : '', v ? v.gstin : '']; })(),
+                t.payKind === 'advance' ? 'Advance' : t.payKind === 'invoice' ? 'Against invoice' : '', t.billDate || '',
+                t.billAmount == null ? '' : t.billAmount, t.billGst == null ? '' : t.billGst, t.billTds == null ? '' : t.billTds, t.advAdjusted == null ? '' : t.advAdjusted,
+                t.comments, t.date.slice(0, 7), fyQuarterOf(t.date), fyOf(t.date)
             ].map(cell).join(',')));
             hvDownload(`HV_Finance_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
         };
 
         /* ---------- backup / restore hooks ---------- */
-        window.hvFinanceGetAll = function () { return { transactions: txns, imports: imports }; };
+        window.hvFinanceGetAll = function () { return { transactions: txns, imports: imports, vendors: vendors }; };
         window.hvFinanceReplaceAll = function (data) {
             txns = Array.isArray(data && data.transactions) ? data.transactions : [];
             imports = Array.isArray(data && data.imports) ? data.imports : [];
             save();
+            if (Array.isArray(data && data.vendors)) { vendors = data.vendors; saveVendors(); }   /* older backups have no vendor list: keep the current one */
             hvRenderFinance();
         };
 
@@ -6241,7 +6856,9 @@
         $('finCustomRange').style.display = ui.period === 'custom' ? '' : 'none';
         document.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
-            if ($('finTxnModal').style.display === 'block') hvFinCloseTxnModal();
+            if ($('finVendorModal').style.display === 'block') hvFinCloseVendorModal();
+            else if ($('finTxnModal').style.display === 'block') hvFinCloseTxnModal();
+            else if ($('finVendorsModal').style.display === 'block') hvFinCloseVendors();
             else if ($('finImportModal').style.display === 'block') hvFinCloseImport();
         });
         hvRenderFinance();
