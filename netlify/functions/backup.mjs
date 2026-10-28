@@ -19,13 +19,10 @@ async function github(path, init = {}) {
 }
 
 export async function backupUser(uid, email) {
-  const [leads, tasks, notes, txns, imports, vendors, customers, docs] = await Promise.all(
-    ['crmLeads', 'crmTasks', 'crmNotes', 'hvFinanceTxns', 'hvFinanceImports', 'hvFinanceVendors', 'hvFinanceCustomers', 'hvFinanceDocs'].map(k => readKey(uid, k)));
+  const [leads, tasks, notes] = await Promise.all(['crmLeads', 'crmTasks', 'crmNotes'].map(k => readKey(uid, k)));
   const L = leads || [], T = tasks || [], N = notes || [];
-  const F = { transactions: txns || [], imports: imports || [], vendors: vendors || [], customers: customers || [], docs: docs || [] };
   const data = { app: 'Hypervision CRM', version: 1, exportedAt: new Date().toISOString(), source: 'nightly cloud backup',
-    leadCount: L.length, leads: L, taskCount: T.length, tasks: T, noteCount: N.length, notes: N,
-    financeTxnCount: F.transactions.length, finance: F };
+    leadCount: L.length, leads: L, taskCount: T.length, tasks: T, noteCount: N.length, notes: N };
   return { data, file: 'backup.json', label: email || uid };
 }
 
@@ -38,7 +35,7 @@ export async function writeBackup({ data, file }) {
   const res = await github(`contents/${encodeURIComponent(file)}`, {
     method: 'PUT',
     body: JSON.stringify({
-      message: `Backup ${day}: ${data.leadCount} leads, ${data.taskCount} tasks, ${data.noteCount} notes, ${data.financeTxnCount} finance entries`,
+      message: `Backup ${day}: ${data.leadCount} leads, ${data.taskCount} tasks, ${data.noteCount} notes`,
       content: Buffer.from(text, 'utf8').toString('base64'),
       ...(sha ? { sha } : {})
     })
