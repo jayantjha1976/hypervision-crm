@@ -485,7 +485,9 @@
         .tab-starred:hover, .tab-starred.active { background-color: var(--tab-starred-hover); border-color: #eab308; }
         .tab-count { display: inline-block; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: #eab308; color: #ffffff; font-size: 0.65rem; font-weight: 700; text-align: center; line-height: 1.4; }
         .tab-count:empty { display: none; }
-        .pipeline-value { margin-left: auto; align-self: center; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; padding: 3px 9px; cursor: help; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; background: var(--tab-converted); }
+        .pipeline-value { margin-left: auto; align-self: center; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; padding: 3px 9px; cursor: pointer; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 8px; background: var(--tab-converted); font-family: inherit; transition: all 0.2s ease; }
+        .pipeline-value:hover { background: var(--tab-converted-hover); }
+        .pipeline-value.active { border-color: var(--text-main); font-weight: 700; box-shadow: 0 0 10px rgba(0, 0, 0, 0.08); background: var(--tab-converted-hover); }
         .pipeline-value strong { color: var(--sale-value-color); font-size: 0.85rem; }
         .pipeline-value-count { font-size: 0.68rem; opacity: 0.8; }
         .tab-pipeline .tab-count { background: #6366f1; }
@@ -826,7 +828,7 @@
                 <button class="tab-btn tab-converted" onclick="switchView('converted')">🎯 Converted <span class="tab-count" data-count-view="converted"></span></button>
                 <button class="tab-btn tab-dead" onclick="switchView('dead')">💀 Dead <span class="tab-count" data-count-view="dead"></span></button>
                 <button class="tab-btn tab-parked" onclick="switchView('parked')">🅿️ Parked <span class="tab-count" data-count-view="parked"></span></button>
-                <span id="pipelineValue" class="pipeline-value" title="Sum of the latest quote amount of every open lead (not converted, dead or parked). Follows the Partner / Potential filters."></span>
+                <button type="button" id="pipelineValue" class="pipeline-value tab-revenue" onclick="switchView('revenue')" title="Click to see the leads behind this figure"></button>
             </div>
             </div>
 
@@ -2064,7 +2066,7 @@
 
         function switchView(viewName) {
             currentView = viewName;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-btn, .pipeline-value').forEach(btn => btn.classList.remove('active'));
             const clickedTab = (typeof event !== 'undefined' && event && event.target && event.target.closest) ? event.target.closest('.tab-btn') : null;
             if (clickedTab) {
                 clickedTab.classList.add('active');
@@ -2084,7 +2086,8 @@
                 'converted': 'Converted Leads',
                 'dead': 'Dead Leads',
                 'parked': 'Parked Leads',
-                'starred': 'Starred Leads'
+                'starred': 'Starred Leads',
+                'revenue': 'Potential Revenue'
             };
             document.getElementById('viewTitle').textContent = titles[viewName];
 
@@ -2180,7 +2183,7 @@
 
         function switchViewToPipeline() {
             currentView = 'pipeline';
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-btn, .pipeline-value').forEach(btn => btn.classList.remove('active'));
             document.querySelector('.tab-pipeline').classList.add('active');
             document.getElementById('viewTitle').textContent = 'Pipeline';
             renderTable();
@@ -2252,6 +2255,8 @@
             let matchesTab = true;
             if (currentView === 'pipeline') {
                 matchesTab = hasBeenContacted && (latestDisposition !== 'Not Interested') && (latestDisposition !== 'Deal Done') && !isMissed;
+            } else if (currentView === 'revenue') {
+                matchesTab = isPotentialRevenueLead(lead);
             } else if (currentView === 'parked' || currentView === 'starred') {
                 matchesTab = true;
             } else if (currentView === 'pending') {
@@ -2333,7 +2338,11 @@
             }
         }
 
-        /* Pipeline value: total of the latest quote amounts on open leads (not converted, dead or parked) */
+        /* Potential revenue: open leads (not converted, dead or parked) that have a quote amount */
+        function isPotentialRevenueLead(lead) {
+            const v = parseFloat(lead.quoteValue);
+            return !!lead.quoteValue && !isNaN(v) && v > 0 && !['converted', 'dead', 'parked'].includes(getLeadHomeView(lead));
+        }
         function updatePipelineValue() {
             const el = document.getElementById('pipelineValue');
             if (!el) return;
@@ -2341,15 +2350,14 @@
             const subCat = document.getElementById('subCategoryFilter').value;
             let total = 0, count = 0;
             leads.forEach(lead => {
-                if (!lead.quoteValue) return;
-                if (['converted', 'dead', 'parked'].includes(getLeadHomeView(lead))) return;
+                if (!isPotentialRevenueLead(lead)) return;
                 if (mainCat !== 'All' && lead.mainCategory !== mainCat && lead.mainCategory !== 'Both') return;
                 if (subCat !== 'All' && lead.subCategory !== subCat) return;
-                const v = parseFloat(lead.quoteValue);
-                if (!isNaN(v)) { total += v; count++; }
+                total += parseFloat(lead.quoteValue); count++;
             });
-            el.innerHTML = `💰 Pipeline <strong>${formatCurrency(total)}</strong>`;
-            el.title = `Pipeline value: ${formatCurrency(total)} across ${count} open quote${count === 1 ? '' : 's'}.\nSum of the latest quote amount of every open lead (not converted, dead or parked). Follows the Partner / Potential filters.`;
+            el.innerHTML = `💰 Potential Revenue <strong>${formatCurrency(total)}</strong>`;
+            el.title = `Potential revenue: ${formatCurrency(total)} across ${count} open quote${count === 1 ? '' : 's'}.\nSum of the latest quote amount of every open lead (not converted, dead or parked). Follows the Partner / Potential filters.\nClick to see these leads.`;
+            el.classList.toggle('active', currentView === 'revenue' && !getSearchQuery());
         }
 
         function renderTable() {
@@ -2357,7 +2365,7 @@
 
             const headerRow = document.getElementById('tableHeaderRow');
             const isGlobalSearch = getSearchQuery() !== '';
-            const layoutView = isGlobalSearch ? 'pipeline' : currentView;
+            const layoutView = isGlobalSearch ? 'pipeline' : (currentView === 'revenue' ? 'starred' : currentView);   /* Potential Revenue uses the Starred layout: stage + next follow-up */
             const showExtraNextDateCol = ['pipeline', 'today', 'nextDay', 'next7Days', 'remaining', 'missed', 'starred'].includes(layoutView);
 
             updateTabCounts();
@@ -2467,6 +2475,8 @@
                     if (!nextB) return -1;
                     return new Date(nextA) - new Date(nextB);
                 });
+            } else if (currentView === 'revenue') {
+                mappedLeads.sort((a, b) => (parseFloat(b.lead.quoteValue) || 0) - (parseFloat(a.lead.quoteValue) || 0));   /* biggest quote first */
             } else {
                 mappedLeads.sort((a, b) => new Date(b.lead.createdAt) - new Date(a.lead.createdAt));
             }
@@ -2492,14 +2502,14 @@
             if (isAdminLoggedIn) totalCols++;
 
             if (filteredLeads.length === 0) {
-                const emptyMsg = (layoutView === 'starred') ? 'No starred leads yet. Click the ☆ next to any lead to add it here.' : 'No leads found matching current filters.';
+                const emptyMsg = currentView === 'revenue' && !isGlobalSearch ? 'No open leads with a quote amount yet.' : (layoutView === 'starred') ? 'No starred leads yet. Click the ☆ next to any lead to add it here.' : 'No leads found matching current filters.';
                 tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state" style="text-align: center; color: var(--text-muted); padding: 20px;">${emptyMsg}</td></tr>`;
                 updateBatchDeleteButtonVisibility();
                 return;
             }
 
             filteredLeads.forEach(({ lead, index }, serialNum) => {
-                const rowView = (isGlobalSearch || currentView === 'starred') ? getLeadHomeView(lead) : currentView;
+                const rowView = (isGlobalSearch || currentView === 'starred' || currentView === 'revenue') ? getLeadHomeView(lead) : currentView;
                 let productsArray = Array.isArray(lead.product) ? lead.product : (lead.product ? [lead.product] : []);
                 let productHtml = productsArray.map(p => `<span class="product-tag">${p}</span>`).join('');
                 
