@@ -3,7 +3,7 @@
    The dashboard itself is unchanged: it keeps reading/writing localStorage,
    and hv-cloud.js copies those keys to and from Firebase. */
 (function () {
-  var KEYS = ['crmLeads', 'crmTasks', 'crmNotes', 'hvFinanceTxns', 'hvFinanceImports', 'hvFinanceVendors'];
+  var KEYS = ['crmLeads', 'crmTasks', 'crmNotes', 'hvFinanceTxns', 'hvFinanceImports', 'hvFinanceVendors', 'hvFinanceCustomers', 'hvFinanceDocs'];
   var STATE_KEY = 'hvCloudState';
   var proto = Storage.prototype;
   var oSet = proto.setItem, oRemove = proto.removeItem, oClear = proto.clear;

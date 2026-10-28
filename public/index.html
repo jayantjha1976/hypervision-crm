@@ -953,12 +953,13 @@
                         <select id="finCategoryFilter" class="task-filter-select" onchange="hvRenderFinance()"></select>
                     </div>
                     <div class="filter-group" id="finVendorFilterWrap" style="display: none;">
-                        <span class="filter-label">Vendor:</span>
+                        <span class="filter-label">Party:</span>
                         <select id="finVendorFilter" class="task-filter-select" onchange="hvRenderFinance()"></select>
                     </div>
                 </div>
                 <div class="filter-controls-right">
-                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenVendors()" title="Vendor list, with each vendor's payments, invoices, TDS and advances">🏢 Vendors</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenDocs()" title="Purchase bills, sales invoices and PIs, with what is paid / received and the balance">🧾 Invoices / PIs</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenParties('purchase')" title="Vendors and customers, with each one's invoices, payments and balance">🏢 Vendors &amp; Customers</button>
                     <button type="button" class="theme-toggle-btn" onclick="hvFinExportCSV()" title="Download the transactions shown as a CSV file (opens in Excel)">⬇️ Export</button>
                     <button type="button" class="theme-toggle-btn" onclick="hvFinOpenImport()" title="Upload a bank statement (CSV, XLS or XLSX)">⬆️ Import Statement</button>
                     <button type="button" class="btn-add-lead" onclick="hvFinOpenTxnModal(null)">+ Add Entry</button>
@@ -3710,7 +3711,7 @@
                     : `\nThis backup has no notes, so your current notes stay as they are.`;
                 const currentFinance = window.hvFinanceGetAll ? window.hvFinanceGetAll().transactions : [];
                 const financeLine = incomingFinance
-                    ? `\nIt also REPLACES the ${currentFinance.length} finance transactions with the ${incomingFinance.transactions.length} in this backup${Array.isArray(incomingFinance.vendors) ? ` (and the vendor list with its ${incomingFinance.vendors.length} vendors)` : ''}.`
+                    ? `\nIt also REPLACES the ${currentFinance.length} finance transactions with the ${incomingFinance.transactions.length} in this backup${Array.isArray(incomingFinance.vendors) ? ` (and the vendor / customer lists and invoices / PIs it holds)` : ''}.`
                     : `\nThis backup has no finance data, so your current finance transactions stay as they are.`;
                 const ok = confirm(`Restore ${incoming.length} leads from "${file.name}"?\n\nThis REPLACES the ${leads.length} leads currently in the dashboard.${tasksLine}${notesLine}${financeLine}\nA safety backup of the current data will download first.`);
                 if (!ok) return;
@@ -5273,91 +5274,36 @@
 
                 <div class="span-2">
                     <label for="fin-category" id="finCategoryLabel">Source</label>
-                    <select id="fin-category" onchange="hvFinCategoryChanged()"></select>
+                    <select id="fin-category" onchange="hvFinCategoryChanged(true)"></select>
                 </div>
                 <div class="span-2" id="finPartyWrap">
                     <label for="fin-party" id="finPartyLabel">Received From</label>
                     <input type="text" id="fin-party" list="finPartyList" maxlength="120" placeholder="Customer / vendor name">
                 </div>
-                <div class="span-2" id="finVendorWrap" style="display: none;">
-                    <label for="fin-vendor">Vendor</label>
+                <div class="span-2" id="finPtyWrap" style="display: none;">
+                    <label for="fin-pty" id="finPtyLabel">Vendor</label>
                     <div class="fin-vendor-pick">
-                        <select id="fin-vendor" onchange="hvFinVendorPicked()"></select>
-                        <button type="button" class="fin-mini-btn" onclick="hvFinOpenVendorModal(null, 'txn')" title="Add a new vendor">+ New</button>
+                        <select id="fin-pty" onchange="hvFinPartyPicked()"></select>
+                        <button type="button" class="fin-mini-btn" onclick="hvFinNewPartyFromTxn()" title="Add a new one">+ New</button>
                     </div>
-                    <div class="fin-vendor-hint" id="finVendorHint"></div>
+                    <div class="fin-vendor-hint" id="finPtyHint"></div>
                 </div>
 
-                <!-- Vendor payments: against an invoice, or an advance to adjust later -->
-                <div class="full-width fin-vendor-box" id="finVendorBox" style="display: none;">
-                    <div class="fin-box-heading fin-box-heading-vendor">🏢 Vendor Payment</div>
+                <!-- Vendor payments / customer receipts: against an invoice or PI, or an advance -->
+                <div class="full-width fin-vendor-box" id="finPtyBox" style="display: none;">
+                    <div class="fin-box-heading fin-box-heading-vendor" id="finPtyHeading">🏢 Vendor Payment</div>
                     <div class="fin-paykind" role="group" aria-label="Payment type">
-                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="invoice" onchange="hvFinPayKindChanged()" checked> 🧾 Against invoice</label>
-                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="advance" onchange="hvFinPayKindChanged()"> ⏳ Advance (adjust against future invoices)</label>
+                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="invoice" onchange="hvFinPayKindChanged()" checked> 🧾 Against invoice / PI</label>
+                        <label class="fin-paykind-opt"><input type="radio" name="fin-paykind" value="advance" onchange="hvFinPayKindChanged()"> ⏳ Advance (no invoice / PI yet)</label>
                     </div>
-                    <div class="form-grid" id="finVinvGrid" style="gap: 8px; margin-top: 8px;">
-                        <div class="span-2">
-                            <label for="fin-vinv-no">Vendor Invoice No</label>
-                            <input type="text" id="fin-vinv-no" maxlength="60" placeholder="As printed on the vendor's bill" oninput="hvFinUpdateVendorRecon()">
+                    <div id="finDocRow" style="margin-top: 8px;">
+                        <label for="fin-doc">Invoice / PI</label>
+                        <div class="fin-vendor-pick">
+                            <select id="fin-doc" onchange="hvFinDocPicked()"></select>
+                            <button type="button" class="fin-mini-btn" onclick="hvFinNewDocFromTxn()" title="Enter a new invoice or PI">+ New</button>
                         </div>
-                        <div class="span-2">
-                            <label for="fin-vinv-date">Invoice Date</label>
-                            <input type="date" id="fin-vinv-date">
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-vinv-amount">Invoice Amount (incl. GST)</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-vinv-amount" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-vinv-gst">GST in Invoice</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-vinv-gst" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this)"></div>
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-vinv-tds">TDS Deducted (by us)</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-vinv-tds" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-vinv-adv">Advance Adjusted</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-vinv-adv" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateVendorRecon();"></div>
-                        </div>
-                        <div class="full-width fin-recon" id="finVendorRecon"></div>
                     </div>
-                    <div class="fin-recon" id="finAdvanceNote" style="display: none; margin-top: 8px;"></div>
-                </div>
-
-                <!-- Sales: invoice details -->
-                <div class="full-width fin-sales-box" id="finSalesBox" style="display: none;">
-                    <div class="fin-box-heading">🧾 Sales Invoice Details</div>
-                    <div class="form-grid" style="gap: 8px;">
-                        <div class="span-2">
-                            <label for="fin-inv-no">Invoice No</label>
-                            <input type="text" id="fin-inv-no" maxlength="60" placeholder="e.g. HV/2026-27/045">
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-inv-date">Invoice Date</label>
-                            <input type="date" id="fin-inv-date">
-                        </div>
-                        <div class="span-2">
-                            <label for="fin-inv-amount">Invoice Amount (incl. GST)</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-inv-amount" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateRecon();"></div>
-                        </div>
-                        <div>
-                            <label for="fin-inv-gst">GST Amount</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-inv-gst" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this)"></div>
-                        </div>
-                        <div>
-                            <label for="fin-inv-tds">TDS Deducted</label>
-                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
-                                <input type="text" id="fin-inv-tds" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinUpdateRecon();"></div>
-                        </div>
-                        <div class="full-width fin-recon" id="finRecon"></div>
-                    </div>
+                    <div class="fin-recon" id="finPtyRecon" style="margin-top: 6px;"></div>
                 </div>
 
                 <!-- Debits: vendor bill number -->
@@ -5423,15 +5369,127 @@
         </div>
     </div>
 
-    <!-- ===== Finance: Vendors list + vendor ledger ===== -->
-    <div id="finVendorsModal" class="modal" onclick="if (event.target === this) hvFinCloseVendors()">
-        <div class="modal-content" style="max-width: 1040px;" onclick="event.stopPropagation()">
-            <span class="close-btn" onclick="hvFinCloseVendors()">&times;</span>
-            <div id="finVendorsBody"></div>
+    <!-- ===== Finance: Vendors & Customers list + ledger ===== -->
+    <div id="finPartiesModal" class="modal" onclick="if (event.target === this) hvFinCloseParties()">
+        <div class="modal-content" style="max-width: 1080px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="hvFinCloseParties()">&times;</span>
+            <div id="finPartiesBody"></div>
         </div>
     </div>
 
-    <!-- ===== Finance: Add / Edit a vendor (opens on top of the other finance windows) ===== -->
+    <!-- ===== Finance: Invoices / PIs register (+ TDS) ===== -->
+    <div id="finDocsModal" class="modal" onclick="if (event.target === this) hvFinCloseDocs()">
+        <div class="modal-content" style="max-width: 1180px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="hvFinCloseDocs()">&times;</span>
+            <div id="finDocsBody"></div>
+        </div>
+    </div>
+
+    <!-- ===== Finance: one invoice / PI (details + payment history) ===== -->
+    <div id="finDocModal" class="modal" onclick="if (event.target === this) hvFinCloseDoc()">
+        <div class="modal-content" style="max-width: 720px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="hvFinCloseDoc()">&times;</span>
+            <h2 id="fdTitle" style="margin-bottom: 4px; font-size: 1.1rem;">New Invoice / PI</h2>
+            <div class="fin-modal-sub" id="fdSub"></div>
+            <form id="finDocForm" class="form-grid" autocomplete="off" onsubmit="event.preventDefault(); hvFinSaveDoc();">
+                <div class="full-width">
+                    <div class="fin-paykind" role="group" aria-label="Document type">
+                        <label class="fin-paykind-opt"><input type="radio" name="fd-kind" value="Invoice" checked onchange="hvFinDocKindChanged()"> 🧾 Tax Invoice</label>
+                        <label class="fin-paykind-opt"><input type="radio" name="fd-kind" value="PI" onchange="hvFinDocKindChanged()"> 📄 Proforma Invoice (PI)</label>
+                    </div>
+                    <div class="fin-recon" id="fdPiNote" style="margin-top: 6px;"></div>
+                </div>
+                <div class="full-width">
+                    <label for="fd-party" id="fdPartyLabel">Vendor</label>
+                    <div class="fin-vendor-pick">
+                        <select id="fd-party" onchange="hvFinDocPartyPicked()"></select>
+                        <button type="button" class="fin-mini-btn" onclick="hvFinNewPartyFromDoc()" title="Add a new one">+ New</button>
+                    </div>
+                </div>
+                <div class="span-2">
+                    <label for="fd-no" id="fdNoLabel">Invoice No *</label>
+                    <input type="text" id="fd-no" maxlength="60" placeholder="As printed on the document">
+                </div>
+                <div>
+                    <label for="fd-date" id="fdDateLabel">Invoice Date *</label>
+                    <input type="date" id="fd-date" onchange="hvFinDocCalc()">
+                </div>
+                <div>
+                    <label for="fd-due">Due Date</label>
+                    <input type="date" id="fd-due">
+                </div>
+                <div>
+                    <label for="fd-taxable">Amount (before GST)</label>
+                    <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                        <input type="text" id="fd-taxable" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinDocCalc('taxable');"></div>
+                </div>
+                <div>
+                    <label for="fd-gst">GST</label>
+                    <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                        <input type="text" id="fd-gst" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinDocCalc('gst');"></div>
+                </div>
+                <div class="span-2">
+                    <label for="fd-total">Grand Total (incl. GST) *</label>
+                    <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                        <input type="text" id="fd-total" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinDocCalc('total');"></div>
+                    <div class="fin-vendor-hint">GST at 18% fills in from the amount; change it if the rate differs.</div>
+                </div>
+
+                <div class="full-width fin-tds-box">
+                    <div class="fin-box-heading" id="fdTdsHeading" style="color:#7c3aed;">🧮 TDS</div>
+                    <div class="form-grid" style="gap: 8px;">
+                        <div>
+                            <label for="fd-tds-rate">TDS %</label>
+                            <input type="text" id="fd-tds-rate" inputmode="decimal" maxlength="5" placeholder="e.g. 2" oninput="this.value = this.value.replace(/[^0-9.]/g, ''); hvFinDocCalc('rate');">
+                        </div>
+                        <div>
+                            <label for="fd-tds" id="fdTdsLabel">TDS Deducted</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fd-tds" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this); hvFinDocCalc('tds');"></div>
+                        </div>
+                        <div class="fin-tds-dep">
+                            <label for="fd-tds-dep">Deposit Date</label>
+                            <input type="date" id="fd-tds-dep" onchange="hvFinDocCalc()">
+                        </div>
+                        <div class="fin-tds-dep">
+                            <label for="fd-tds-pen">Penalty / Interest</label>
+                            <div class="currency-input-group"><span class="currency-prefix">₹</span>
+                                <input type="text" id="fd-tds-pen" placeholder="0.00" inputmode="decimal" oninput="hvFinAmountInput(this)"></div>
+                        </div>
+                        <div class="full-width fin-recon" id="fdTdsNote"></div>
+                    </div>
+                </div>
+
+                <div class="span-2">
+                    <label for="fd-client">Client / Project</label>
+                    <input type="text" id="fd-client" list="fdClientList" maxlength="120" placeholder="e.g. IBM, Yazaki – HoloBox">
+                </div>
+                <div class="span-2" id="fdViaWrap">
+                    <label for="fd-via">Via (supplier / partner)</label>
+                    <input type="text" id="fd-via" list="fdViaList" maxlength="80" placeholder="e.g. M911, OpEzee">
+                </div>
+                <div class="full-width">
+                    <label for="fd-desc">Description</label>
+                    <input type="text" id="fd-desc" maxlength="300" placeholder="What it is for">
+                </div>
+                <div class="full-width">
+                    <label for="fd-notes">Notes</label>
+                    <textarea id="fd-notes" rows="2" maxlength="1000" placeholder="Anything worth remembering"></textarea>
+                </div>
+                <div class="full-width fin-modal-actions">
+                    <button type="button" class="btn-primary fin-btn-secondary" onclick="hvFinCloseDoc()">Cancel</button>
+                    <button type="button" class="btn-primary fin-btn-danger" id="fdDeleteBtn" onclick="hvFinDeleteDoc()">Delete</button>
+                    <button type="button" class="btn-primary fin-btn-next" id="fdConvertBtn" onclick="hvFinConvertPI()" title="The tax invoice for this PI has come: keep the PI's payments, enter the invoice no and date">PI → Tax Invoice</button>
+                    <button type="submit" class="btn-primary" style="flex: 2;">Save</button>
+                </div>
+            </form>
+            <div id="fdHistory"></div>
+        </div>
+    </div>
+    <datalist id="fdClientList"></datalist>
+    <datalist id="fdViaList"></datalist>
+
+    <!-- ===== Finance: Add / Edit a vendor or customer (opens on top of the other finance windows) ===== -->
     <div id="finVendorModal" class="modal" onclick="if (event.target === this) hvFinCloseVendorModal()">
         <div class="modal-content" style="max-width: 600px;" onclick="event.stopPropagation()">
             <span class="close-btn" onclick="hvFinCloseVendorModal()">&times;</span>
@@ -5439,8 +5497,8 @@
             <div class="fin-modal-sub">Only the name is required. GSTIN fills in the PAN automatically.</div>
             <form id="finVendorForm" class="form-grid" autocomplete="off" onsubmit="event.preventDefault(); hvFinSaveVendor();">
                 <div class="full-width">
-                    <label for="fv-name">Vendor Name *</label>
-                    <input type="text" id="fv-name" maxlength="120" placeholder="e.g. Sharma Fabricators Pvt Ltd" required>
+                    <label for="fv-name" id="fvNameLabel">Vendor Name *</label>
+                    <input type="text" id="fv-name" maxlength="120" placeholder="Company name" required>
                 </div>
                 <div class="span-2">
                     <label for="fv-gstin">GST Number (GSTIN)</label>
@@ -5464,9 +5522,14 @@
                     <input type="email" id="fv-email" maxlength="120" placeholder="Optional">
                 </div>
                 <div class="span-2">
-                    <label for="fv-type">What they supply</label>
+                    <label for="fv-type" id="fvTypeLabel">What they supply</label>
                     <input type="text" id="fv-type" maxlength="80" placeholder="e.g. Fabrication, Printing, CA">
                 </div>
+                <div class="span-2">
+                    <label for="fv-tds-rate">Usual TDS %</label>
+                    <input type="text" id="fv-tds-rate" inputmode="decimal" maxlength="5" placeholder="e.g. 2 (fills in on their invoices)" oninput="this.value = this.value.replace(/[^0-9.]/g, '')">
+                </div>
+                <div class="span-2"></div>
                 <div class="full-width">
                     <label for="fv-address">Address</label>
                     <textarea id="fv-address" rows="2" maxlength="400" placeholder="Optional"></textarea>
@@ -5478,7 +5541,7 @@
                 <div class="full-width fin-modal-actions">
                     <button type="button" class="btn-primary fin-btn-secondary" onclick="hvFinCloseVendorModal()">Cancel</button>
                     <button type="button" class="btn-primary fin-btn-danger" id="fvDeleteBtn" onclick="hvFinDeleteVendor()">Delete</button>
-                    <button type="submit" class="btn-primary" style="flex: 2;">Save Vendor</button>
+                    <button type="submit" class="btn-primary" style="flex: 2;" id="fvSaveBtn">Save Vendor</button>
                 </div>
             </form>
         </div>
@@ -5613,8 +5676,29 @@
         .fin-bal-ok { color: #059669; font-weight: 700; }
         .fin-back { background: none; border: none; color: #6366f1; font-weight: 700; cursor: pointer; font-size: 0.78rem; padding: 0; font-family: inherit; }
         #finTxnModal { z-index: 1050; }
+        #finDocModal { z-index: 1080; }
+        .fin-cp { font-size: 0.7rem; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fin-tds-box { background: rgba(124, 58, 237, 0.05); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 8px; padding: 10px; }
+        .fin-doc-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+        .fin-doc-tab { border: 1px solid var(--border-color); background: var(--history-item-bg); color: var(--text-main); border-radius: 8px; padding: 6px 12px; font-size: 0.75rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .fin-doc-tab.active { border-color: #6366f1; background: rgba(99, 102, 241, 0.14); color: #4f46e5; }
+        .fin-doc-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+        .fin-doc-filters select, .fin-doc-filters input { height: 32px; font-size: 0.75rem; padding: 0 8px; width: auto; min-width: 120px; }
+        .fin-doc-filters input { width: 220px; }
+        .fin-st { display: inline-block; font-size: 0.64rem; font-weight: 700; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
+        .fin-st.open { color: #dc2626; background: rgba(239, 68, 68, 0.12); }
+        .fin-st.part { color: #b45309; background: rgba(245, 158, 11, 0.15); }
+        .fin-st.paid { color: #059669; background: rgba(16, 185, 129, 0.14); }
+        .fin-st.excess { color: #7c3aed; background: rgba(124, 58, 237, 0.12); }
+        .fin-st.pi { color: #2563eb; background: rgba(37, 99, 235, 0.12); }
+        .fin-link-list { max-height: 34vh; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 6px; }
+        .fin-link-row { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border-color); font-size: 0.72rem; cursor: pointer; }
+        .fin-link-row:hover { background: rgba(99, 102, 241, 0.08); }
+        .fin-link-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+        .fin-hist-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        @media (max-width: 640px) { .fin-doc-filters input { width: 100%; } }
         /* finance windows grow with their content; the dark backdrop scrolls instead of the box being cut short */
-        #finTxnModal .modal-content, #finVendorModal .modal-content, #finVendorsModal .modal-content { max-height: none; margin-bottom: 4vh; }
+        #finTxnModal .modal-content, #finVendorModal .modal-content, #finPartiesModal .modal-content, #finDocsModal .modal-content, #finDocModal .modal-content { max-height: none; margin-bottom: 4vh; }
         #finVendorModal { z-index: 1100; }
         @media (max-width: 640px) {
             .fin-vhead input { width: 100%; }
@@ -5703,6 +5787,14 @@
         function saveVendors() {
             try { localStorage.setItem(VEN_KEY, JSON.stringify(vendors)); } catch (e) { alert('Could not save vendors: ' + e.message); }
         }
+        const CUS_KEY = 'hvFinanceCustomers', DOC_KEY = 'hvFinanceDocs';
+        let customers = [];   /* same shape as vendors */
+        let docs = [];        /* invoices / PIs: [{ id, side: 'purchase'|'sales', kind: 'Invoice'|'PI', partyId, no, date, dueDate, taxable, gst, total,
+                                 tdsRate, tds, tdsDeposit (deposit date, or date checked in 26AS for sales), tdsPenalty, client, via, description, notes, piNo, piDate }] */
+        try { customers = JSON.parse(localStorage.getItem(CUS_KEY) || '[]'); if (!Array.isArray(customers)) customers = []; } catch (e) { customers = []; }
+        try { docs = JSON.parse(localStorage.getItem(DOC_KEY) || '[]'); if (!Array.isArray(docs)) docs = []; } catch (e) { docs = []; }
+        function saveCustomers() { try { localStorage.setItem(CUS_KEY, JSON.stringify(customers)); } catch (e) { alert('Could not save customers: ' + e.message); } }
+        function saveDocs() { try { localStorage.setItem(DOC_KEY, JSON.stringify(docs)); } catch (e) { alert('Could not save invoices / PIs: ' + e.message); } }
 
         let ui = { view: 'all', period: 'all', sortAsc: false };
         try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch (e) {}
@@ -5948,10 +6040,10 @@
                 if (acct && (t.account || '') !== acct) return false;
                 if (cat === '__uncat') { if (!isUncat(t)) return false; }
                 else if (cat && t.category !== cat) return false;
-                if (ven && t.vendorId !== ven) return false;
+                if (ven) { const [vs, vid] = ven.split(':'); if (sideOfTxn(t) !== vs || t[SIDES[vs].idField] !== vid) return false; }
                 if (q) {
-                    const v = t.vendorId ? vendorById(t.vendorId) : null;
-                    const hay = [t.refNo, t.narration, t.party, t.invoiceNo, t.billNo, t.comments, t.category, t.account, String(t.amount), v ? v.name + ' ' + (v.gstin || '') : ''].join(' ').toLowerCase();
+                    const v = partyOfTxn(t), d = docById(t.docId);
+                    const hay = [t.refNo, t.narration, t.party, t.invoiceNo, t.billNo, t.comments, t.category, t.account, String(t.amount), v ? v.name + ' ' + (v.gstin || '') : '', d ? d.no + ' ' + (d.client || '') : ''].join(' ').toLowerCase();
                     if (!hay.includes(q)) return false;
                 }
                 return true;
@@ -5964,50 +6056,97 @@
             return true;
         }
 
-        /* ---------- vendors: helpers + running totals ---------- */
-        const isVendorCat = (type, cat) => type === 'Debit' && !!cat && !FIN_NON_VENDOR_DEBITS.includes(cat);
-        const vendorById = id => (id ? vendors.find(v => v.id === id) : null) || null;
-        const vendorByName = name => { const n = norm(name); return n ? vendors.find(v => norm(v.name) === n) || null : null; };
-        const sortedVendors = () => vendors.slice().sort((a, b) => a.name.localeCompare(b.name));
+        /* ---------- parties (vendors / customers) + invoices / PIs: helpers + running totals ---------- */
+        const FIN_CUSTOMER_CATS = ['Sales', 'Advance from Customer'];
+        const SIDES = {
+            purchase: { list: () => vendors, save: () => saveVendors(), txnType: 'Debit', idField: 'vendorId', word: 'Vendor', words: 'Vendors', icon: '🏢',
+                paidWord: 'Paid', payWord: 'payment', defaultCat: 'Vendor / Contractor Payment', docWords: 'Purchase bills / PIs', prefix: 'ven_' },
+            sales: { list: () => customers, save: () => saveCustomers(), txnType: 'Credit', idField: 'customerId', word: 'Customer', words: 'Customers', icon: '🤝',
+                paidWord: 'Received', payWord: 'receipt', defaultCat: 'Sales', docWords: 'Sales invoices / PIs', prefix: 'cus_' }
+        };
+        /* Which side a category belongs to: debits to vendors (except salaries, taxes, bank, loans, transfers...), Sales / customer advances to customers */
+        const sideOfCat = (type, cat) => type === 'Debit' ? (cat && !FIN_NON_VENDOR_DEBITS.includes(cat) ? 'purchase' : '') : (FIN_CUSTOMER_CATS.includes(cat) ? 'sales' : '');
+        const sideOfTxn = t => sideOfCat(t.type, t.category);
+        const partyById = (side, id) => (id && side ? SIDES[side].list().find(p => p.id === id) : null) || null;
+        const partyByName = (side, name) => { const n = norm(name); return n ? SIDES[side].list().find(p => norm(p.name) === n) || null : null; };
+        const partyOfTxn = t => { const s = sideOfTxn(t); return s ? partyById(s, t[SIDES[s].idField]) : null; };
+        const sortedParties = side => SIDES[side].list().slice().sort((a, b) => a.name.localeCompare(b.name));
+        const vendorById = id => partyById('purchase', id);
+        const docById = id => (id ? docs.find(d => d.id === id) : null) || null;
         const num = v => Number(v || 0);
         const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-
-        /* Everything paid to one vendor, grouped by invoice.
-           A payment "against invoice" settles: bank amount + TDS deducted + advance adjusted.
-           Several payments with the same invoice no. count as part payments of one invoice. */
-        function vendorStats(vid, skipId) {
-            const pays = txns.filter(t => t.vendorId === vid && t.type === 'Debit' && t.id !== skipId);
-            let paid = 0, tds = 0, advPaid = 0, advAdj = 0, last = '';
-            const invMap = new Map();
-            pays.forEach(t => {
-                const amt = num(t.amount);
-                paid += amt;
-                if (t.date > last) last = t.date;
-                if (t.payKind === 'advance') { advPaid += amt; return; }
-                tds += num(t.billTds); advAdj += num(t.advAdjusted);
-                const key = t.billNo ? norm(t.billNo) : '_' + t.id;
-                let inv = invMap.get(key);
-                if (!inv) { inv = { no: t.billNo || '', date: '', amount: null, gst: null, paid: 0, tds: 0, adv: 0, txns: [] }; invMap.set(key, inv); }
-                if (t.billAmount != null && t.billAmount !== '') inv.amount = Math.max(inv.amount || 0, num(t.billAmount));
-                if (t.billGst != null && t.billGst !== '') inv.gst = Math.max(inv.gst || 0, num(t.billGst));
-                if (t.billDate && (!inv.date || t.billDate < inv.date)) inv.date = t.billDate;
-                inv.paid += amt; inv.tds += num(t.billTds); inv.adv += num(t.advAdjusted);
-                inv.txns.push(t);
-            });
-            const invoices = [...invMap.values()].map(inv => Object.assign(inv, {
-                paid: round2(inv.paid), tds: round2(inv.tds), adv: round2(inv.adv),
-                balance: inv.amount == null ? null : round2(inv.amount - inv.paid - inv.tds - inv.adv)
-            })).sort((a, b) => (b.date || (b.txns[0] && b.txns[0].date) || '').localeCompare(a.date || (a.txns[0] && a.txns[0].date) || ''));
-            const invoiced = round2(invoices.reduce((s, i) => s + (i.amount || 0), 0));
-            const gst = round2(invoices.reduce((s, i) => s + (i.gst || 0), 0));
-            const due = round2(invoices.reduce((s, i) => s + (i.balance > 0.009 ? i.balance : 0), 0));
-            return { pays, count: pays.length, paid: round2(paid), tds: round2(tds), advPaid: round2(advPaid), advAdj: round2(advAdj),
-                advOpen: round2(advPaid - advAdj), invoices, invoiced, gst, due, last };
+        const docTag = d => (d.kind === 'PI' ? 'PI ' : 'Inv ') + (d.no || '');
+        /* TDS deposit is due by the 7th of the next month (30 April for March) — worked out from the invoice date */
+        function tdsDueDate(iso) {
+            if (!iso) return '';
+            let y = +iso.slice(0, 4), m = +iso.slice(5, 7);
+            if (m === 3) return isoOf(y, 4, 30);
+            m += 1; if (m > 12) { m = 1; y += 1; }
+            return isoOf(y, m, 7);
         }
-        function vendorOptions(selectedId) {
-            return '<option value="">— Select vendor —</option>'
-                + sortedVendors().map(v => `<option value="${esc(v.id)}"${v.id === selectedId ? ' selected' : ''}>${esc(v.name)}${v.gstin ? ' · ' + esc(v.gstin) : ''}</option>`).join('')
-                + '<option value="__new">➕ Add new vendor…</option>';
+        /* put the cursor in a window's first field — unless the user already clicked into that window */
+        function softFocus(modalId, el) { setTimeout(() => { const m = $(modalId); if (el && m && !m.contains(document.activeElement)) el.focus(); }, 30); }
+        const todayIso = () => { const d = new Date(); return isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+
+        /* One invoice / PI: what it is worth, what has been paid against it, the balance.
+           Balance = Grand Total − TDS − payments linked to it. */
+        function docStats(d, skipId) {
+            const pays = txns.filter(t => t.docId === d.id && t.id !== skipId);
+            const paid = round2(pays.reduce((s, t) => s + num(t.amount) + num(t.tds) + num(t.advAdjusted), 0));   /* tds / advAdjusted: only on entries saved before 29 Oct 2026 */
+            const total = num(d.total), tds = num(d.tds);
+            const net = round2(total - tds);
+            const balance = round2(net - paid);
+            let status = 'open';
+            if (d.total == null || d.total === '') status = paid ? 'part' : 'open';
+            else if (Math.abs(balance) < 0.01) status = 'paid';
+            else if (balance < 0) status = 'excess';
+            else if (paid > 0) status = 'part';
+            const last = pays.reduce((m, t) => t.date > m ? t.date : m, '');
+            return { pays, paid, total, tds, net, balance, status, last };
+        }
+        function statusHtml(side, st, d) {
+            const L = side === 'sales'
+                ? { open: 'Not received', part: 'Part received', paid: '✓ Received', excess: 'Received extra' }
+                : { open: 'Unpaid', part: 'Part paid', paid: '✓ Paid', excess: 'Paid extra' };
+            return (d && d.kind === 'PI' ? '<span class="fin-st pi">PI</span> ' : '') + `<span class="fin-st ${st.status}">${L[st.status]}</span>`;
+        }
+
+        /* Everything with one vendor / customer */
+        function partyStats(side, pid, skipId) {
+            const S = SIDES[side];
+            const pays = txns.filter(t => t[S.idField] === pid && t.type === S.txnType && sideOfTxn(t) === side && t.id !== skipId);
+            let paid = 0, advPaid = 0, advAdj = 0, last = '';
+            pays.forEach(t => {
+                paid += num(t.amount);
+                advAdj += num(t.advAdjusted);
+                if (t.date > last) last = t.date;
+                if (t.payKind === 'advance') advPaid += num(t.amount);
+            });
+            const pdocs = docs.filter(d => d.side === side && d.partyId === pid).map(d => ({ d, st: docStats(d, skipId) }));
+            const inv = pdocs.filter(x => x.d.kind !== 'PI');
+            const sumOf = (a, f) => round2(a.reduce((s, x) => s + f(x), 0));
+            return {
+                pays, count: pays.length, paid: round2(paid), last, docs: pdocs,
+                advOpen: round2(advPaid - advAdj),
+                invoiced: sumOf(inv, x => num(x.d.total)), gst: sumOf(inv, x => num(x.d.gst)), tds: sumOf(pdocs, x => num(x.d.tds)),
+                due: sumOf(inv, x => x.st.balance > 0.009 ? x.st.balance : 0),
+                piOpen: sumOf(pdocs.filter(x => x.d.kind === 'PI'), x => x.st.balance > 0.009 ? x.st.balance : 0),
+                unlinked: pays.filter(t => t.payKind !== 'advance' && !docById(t.docId)).length
+            };
+        }
+        function partyOptions(side, selectedId) {
+            const S = SIDES[side];
+            return `<option value="">— Select ${S.word.toLowerCase()} —</option>`
+                + sortedParties(side).map(v => `<option value="${esc(v.id)}"${v.id === selectedId ? ' selected' : ''}>${esc(v.name)}${v.gstin ? ' · ' + esc(v.gstin) : ''}</option>`).join('')
+                + `<option value="__new">➕ Add new ${S.word.toLowerCase()}…</option>`;
+        }
+        /* Invoices / PIs of one party for the payment form: unpaid ones first */
+        function docOptions(side, pid, selectedId, skipTxnId) {
+            const list = docs.filter(d => d.side === side && d.partyId === pid).map(d => ({ d, st: docStats(d, skipTxnId) }))
+                .sort((a, b) => ((a.st.balance > 0.009) === (b.st.balance > 0.009) ? 0 : a.st.balance > 0.009 ? -1 : 1) || (b.d.date || '').localeCompare(a.d.date || ''));
+            return `<option value="">${pid ? (list.length ? '— Select invoice / PI —' : '— None yet: add with ➕ —') : '— Pick the ' + SIDES[side].word.toLowerCase() + ' first —'}</option>`
+                + list.map(({ d, st }) => `<option value="${esc(d.id)}"${d.id === selectedId ? ' selected' : ''}>${esc(docTag(d))}${d.date ? ' · ' + esc(fmtDate(d.date)) : ''} · ${money(d.total)}${st.balance > 0.009 ? ' · balance ' + money(st.balance) : st.status === 'paid' ? ' · ✓ settled' : ''}</option>`).join('')
+                + (pid ? '<option value="__new">➕ New invoice / PI…</option>' : '');
         }
 
         /* ---------- dropdown contents ---------- */
@@ -6040,9 +6179,12 @@
 
             const venSel = $('finVendorFilter');
             const curVen = venSel.value;
-            venSel.innerHTML = '<option value="">All vendors</option>' + sortedVendors().map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');
-            venSel.value = vendorById(curVen) ? curVen : '';
-            $('finVendorFilterWrap').style.display = vendors.length ? '' : 'none';
+            venSel.innerHTML = '<option value="">All vendors &amp; customers</option>'
+                + (vendors.length ? '<optgroup label="Vendors">' + sortedParties('purchase').map(v => `<option value="purchase:${esc(v.id)}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '')
+                + (customers.length ? '<optgroup label="Customers">' + sortedParties('sales').map(v => `<option value="sales:${esc(v.id)}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '');
+            venSel.value = curVen;
+            if (venSel.value !== curVen) venSel.value = '';
+            $('finVendorFilterWrap').style.display = vendors.length || customers.length ? '' : 'none';
 
             const parties = new Set(txns.map(t => t.party).filter(Boolean));
             try { (typeof leads !== 'undefined' ? leads : []).forEach(l => { if (l && l.company) parties.add(String(l.company).trim()); }); } catch (e) {}
@@ -6051,6 +6193,7 @@
 
         /* ---------- main render ---------- */
         window.hvRenderFinance = function () {
+            migrateLegacy();
             refreshFilterOptions();
             const base = baseFiltered();
 
@@ -6070,16 +6213,16 @@
                 <span class="fin-chip debit">Debits <strong>${money(dr)}</strong> (${debits.length})</span>
                 <span class="fin-chip">Net <strong style="color:${cr - dr >= 0 ? '#059669' : '#dc2626'}">${cr - dr < 0 ? '−' : ''}${money(Math.abs(cr - dr))}</strong></span>
                 ${uncat ? `<span class="fin-chip warn">To categorise <strong>${uncat}</strong></span>` : (base.length ? '<span class="fin-chip credit"><strong>✓ All categorised</strong></span>' : '')}` : '';
-            const fv = vendorById($('finVendorFilter').value);
+            const [fvs, fvid] = ($('finVendorFilter').value || '').split(':');
+            const fv = fvid ? partyById(fvs, fvid) : null;
             if (fv) {
-                const st = vendorStats(fv.id);   /* all-time figures for the vendor, whatever the period */
+                const st = partyStats(fvs, fv.id);   /* all-time figures, whatever the period */
                 $('finSummary').innerHTML += `
-                <span class="fin-chip" style="border-color:#6366f1;">🏢 <strong>${esc(fv.name)}</strong> (all time)</span>
-                <span class="fin-chip">Paid <strong>${money(st.paid)}</strong></span>
-                <span class="fin-chip">TDS <strong>${money(st.tds)}</strong></span>
-                ${st.advOpen > 0.009 ? `<span class="fin-chip warn">Advance not adjusted <strong>${money(st.advOpen)}</strong></span>` : ''}
+                <span class="fin-chip" style="border-color:#6366f1;">${SIDES[fvs].icon} <strong>${esc(fv.name)}</strong> (all time)</span>
+                <span class="fin-chip">${SIDES[fvs].paidWord} <strong>${money(st.paid)}</strong></span>
                 ${st.due > 0.009 ? `<span class="fin-chip debit">Invoice balance due <strong>${money(st.due)}</strong></span>` : ''}
-                <a href="#" class="fin-chip" style="color:#6366f1;text-decoration:none;" onclick="event.preventDefault(); hvFinOpenVendors('${fv.id}')">📒 Open ledger</a>`;
+                ${st.advOpen > 0.009 ? `<span class="fin-chip warn">Advance not linked <strong>${money(st.advOpen)}</strong></span>` : ''}
+                <a href="#" class="fin-chip" style="color:#6366f1;text-decoration:none;" onclick="event.preventDefault(); hvFinOpenParties('${fvs}', '${fv.id}')">📒 Open ledger</a>`;
             }
 
             const showAcct = txns.some(t => t.account);
@@ -6112,25 +6255,20 @@
             }
             body.innerHTML = rows.map((t, i) => {
                 const isCr = t.type === 'Credit';
-                const ven = vendorById(t.vendorId);
-                let partyHtml = ven
-                    ? `<span class="fin-party"><a class="fin-vlink" onclick="event.stopPropagation(); hvFinOpenVendors('${ven.id}')" title="Open this vendor's ledger">🏢 ${esc(ven.name)}</a></span>`
+                const side = sideOfTxn(t), S = side ? SIDES[side] : null;
+                const pty = side ? partyById(side, t[S.idField]) : null;
+                const doc = pty ? docById(t.docId) : null;
+                let partyHtml = pty
+                    ? `<span class="fin-party"><a class="fin-vlink" onclick="event.stopPropagation(); hvFinOpenParties('${side}', '${pty.id}')" title="Open the ${S.word.toLowerCase()}'s ledger">${S.icon} ${esc(pty.name)}</a></span>`
                     : (t.party ? `<span class="fin-party">${esc(t.party)}</span>` : '');
-                if (!isCr && isVendorCat(t.type, t.category) && ven) {
-                    if (t.payKind === 'advance') partyHtml += ` <span class="fin-kind-badge adv" title="Advance, to be adjusted against a future invoice">Advance</span>`;
-                    else if (t.billNo) {
-                        const bits = ['Inv ' + esc(t.billNo)];
-                        if (t.billDate) bits.push(esc(fmtDate(t.billDate)));
-                        if (num(t.billTds)) bits.push('TDS ' + money(t.billTds));
-                        if (num(t.advAdjusted)) bits.push('Adv adj ' + money(t.advAdjusted));
-                        partyHtml += `<span class="fin-inv">${bits.join(' · ')}</span>`;
-                    } else partyHtml += ` <span class="fin-warn-badge" title="Open the transaction to add the vendor's invoice details">⚠ Invoice details missing</span>`;
-                } else if (!isCr && FIN_VENDOR_REQUIRED.includes(t.category) && !ven) {
-                    partyHtml += ` <span class="fin-warn-badge" title="Open the transaction to pick the vendor">⚠ Vendor not set</span>`;
-                } else if (t.category === 'Sales') {
-                    partyHtml += t.invoiceNo
-                        ? `<span class="fin-inv">Inv ${esc(t.invoiceNo)}${t.invoiceDate ? ' · ' + esc(fmtDate(t.invoiceDate)) : ''}</span>`
-                        : ` <span class="fin-warn-badge" title="Open the transaction to add invoice details">⚠ Invoice details missing</span>`;
+                if (pty) {
+                    if (t.payKind === 'advance') partyHtml += ` <span class="fin-kind-badge adv" title="Advance: link it to the invoice / PI when it comes">Advance</span>`;
+                    else if (doc) {
+                        const ds = docStats(doc);
+                        partyHtml += `<span class="fin-inv"><a class="fin-vlink" onclick="event.stopPropagation(); hvFinOpenDoc('${doc.id}')" title="Open the invoice / PI">${esc(docTag(doc))}</a>${doc.date ? ' · ' + esc(fmtDate(doc.date)) : ''}${ds.balance > 0.009 ? ' · bal ' + money(ds.balance) : ds.status === 'paid' ? ' · ✓' : ''}</span>`;
+                    } else partyHtml += ` <span class="fin-warn-badge" title="Open the entry and pick the invoice / PI it was for">⚠ Invoice / PI not linked</span>`;
+                } else if (side && (side === 'sales' || FIN_VENDOR_REQUIRED.includes(t.category))) {
+                    partyHtml += ` <span class="fin-warn-badge" title="Open the entry to pick the ${S.word.toLowerCase()}">⚠ ${S.word} not set</span>`;
                 } else if (t.billNo) {
                     partyHtml += `<span class="fin-inv">Bill ${esc(t.billNo)}</span>`;
                 }
@@ -6180,8 +6318,8 @@
             t.category = value || '';
             t.updatedAt = new Date().toISOString();
             save();
-            if (value === 'Sales' && !t.invoiceNo) { hvRenderFinance(); hvFinOpenTxnModal(id, true); return; }
-            if (t.type === 'Debit' && FIN_VENDOR_REQUIRED.includes(value) && !vendorById(t.vendorId)) { hvRenderFinance(); hvFinOpenTxnModal(id, 'vendor'); return; }
+            const qs = sideOfCat(t.type, value);
+            if (qs && !partyById(qs, t[SIDES[qs].idField]) && (qs === 'sales' || FIN_VENDOR_REQUIRED.includes(value))) { hvRenderFinance(); hvFinOpenTxnModal(id, 'party'); return; }
             hvRenderFinance();
         };
 
@@ -6206,109 +6344,114 @@
             $('finPartyLabel').textContent = type === 'Credit' ? 'Received From' : 'Paid To';
             hvFinCategoryChanged();
         };
-        window.hvFinCategoryChanged = function () {
-            const type = $('fin-type').value;
-            const isSales = type === 'Credit' && $('fin-category').value === 'Sales';
-            const vendorMode = isVendorCat(type, $('fin-category').value);
-            $('finSalesBox').style.display = isSales ? '' : 'none';
-            $('finBillWrap').style.display = type === 'Debit' && !vendorMode ? '' : 'none';
-            $('finPartyWrap').style.display = vendorMode ? 'none' : '';
-            $('finVendorWrap').style.display = vendorMode ? '' : 'none';
-            $('finVendorBox').style.display = vendorMode ? '' : 'none';
-            $('fin-party').placeholder = isSales ? 'Customer name' : (type === 'Credit' ? 'Who paid' : 'Payee');
-            hvFinUpdateRecon();
-            if (vendorMode) hvFinVendorPicked();
+        window.hvFinCategoryChanged = function (byUser) {
+            const type = $('fin-type').value, cat = $('fin-category').value;
+            const side = sideOfCat(type, cat);
+            $('finSalesBox') && ($('finSalesBox').style.display = 'none');
+            $('finBillWrap').style.display = type === 'Debit' && !side ? '' : 'none';
+            $('finPartyWrap').style.display = side ? 'none' : '';
+            $('finPtyWrap').style.display = side ? '' : 'none';
+            $('finPtyBox').style.display = side ? '' : 'none';
+            $('fin-party').placeholder = type === 'Credit' ? 'Who paid' : 'Payee';
+            if (!side) return;
+            const S = SIDES[side];
+            $('finPtyLabel').textContent = S.word;
+            $('finPtyHeading').textContent = side === 'purchase' ? '🏢 Vendor Payment' : '🤝 Customer Receipt';
+            if (byUser && cat === 'Advance from Customer') setPayKind('advance');
+            else if (byUser && cat === 'Sales') setPayKind('invoice');
+            const sel = $('fin-pty');
+            if (sel.dataset.side !== side) {
+                sel.dataset.side = side;
+                if (!partyById(side, lastPartyPick)) { lastPartyPick = ''; lastDocPick = ''; }
+                sel.innerHTML = partyOptions(side, lastPartyPick);
+            }
+            hvFinPartyPicked();
         };
 
-        /* ---------- vendor part of the transaction form ---------- */
-        let lastVendorPick = '';
+        /* ---------- vendor / customer part of the transaction form ---------- */
+        let lastPartyPick = '', lastDocPick = '', txnReturnDoc = null;
         const payKind = () => { const r = document.querySelector('input[name="fin-paykind"]:checked'); return r ? r.value : 'invoice'; };
         function setPayKind(k) { document.querySelectorAll('input[name="fin-paykind"]').forEach(r => { r.checked = r.value === (k === 'advance' ? 'advance' : 'invoice'); }); }
+        const formSide = () => sideOfCat($('fin-type').value, $('fin-category').value);
 
-        window.hvFinVendorPicked = function () {
-            const sel = $('fin-vendor');
-            if (sel.value === '__new') {
-                sel.value = lastVendorPick;
-                hvFinOpenVendorModal(null, 'txn', vendorById(lastVendorPick) ? '' : $('fin-party').value.trim());
-                return;
-            }
-            lastVendorPick = sel.value;
-            const v = vendorById(sel.value);
-            const hint = $('finVendorHint');
+        window.hvFinPartyPicked = function () {
+            const side = formSide();
+            if (!side) return;
+            const S = SIDES[side];
+            const sel = $('fin-pty');
+            if (sel.value === '__new') { sel.value = lastPartyPick; hvFinNewPartyFromTxn(); return; }
+            if (sel.value !== lastPartyPick) lastDocPick = '';
+            lastPartyPick = sel.value;
+            const p = partyById(side, sel.value);
+            const hint = $('finPtyHint');
             hint.className = 'fin-vendor-hint';
-            if (v) {
-                const st = vendorStats(v.id, editingId);
+            if (p) {
+                const st = partyStats(side, p.id, editingId);
                 const bits = [];
-                if (v.gstin) bits.push('GSTIN ' + esc(v.gstin));
-                if (st.count) bits.push(`${st.count} earlier payment${st.count === 1 ? '' : 's'}, ${money(st.paid)}`);
-                if (st.advOpen > 0.009) bits.push(`<strong style="color:#b45309">advance not yet adjusted ${money(st.advOpen)}</strong>`);
-                hint.innerHTML = bits.join(' · ') + ` · <a onclick="hvFinOpenVendorModal('${v.id}', 'txn')">Edit vendor</a>`;
+                if (p.gstin) bits.push('GSTIN ' + esc(p.gstin));
+                if (st.count) bits.push(`${st.count} earlier ${S.payWord}${st.count === 1 ? '' : 's'}, ${money(st.paid)}`);
+                if (st.due > 0.009) bits.push(`<strong style="color:#dc2626">invoice balance ${money(st.due)}</strong>`);
+                if (st.advOpen > 0.009) bits.push(`<strong style="color:#b45309">advance not linked ${money(st.advOpen)}</strong>`);
+                hint.innerHTML = bits.join(' · ') + ` · <a onclick="hvFinOpenPartyModal('${side}', '${p.id}', 'txn')">Edit</a>`;
             } else {
                 const typed = $('fin-party').value.trim();
-                if (typed) { hint.className = 'fin-vendor-hint warn'; hint.innerHTML = `Paid to (as typed earlier): “${esc(typed)}”. <a onclick="hvFinOpenVendorModal(null, 'txn', document.getElementById('fin-party').value.trim())">Add as vendor</a>`; }
-                else hint.innerHTML = 'Pick from the list, or choose “➕ Add new vendor…”.';
+                if (typed) { hint.className = 'fin-vendor-hint warn'; hint.innerHTML = `As typed earlier: “${esc(typed)}”. <a onclick="hvFinNewPartyFromTxn(true)">Add as ${S.word.toLowerCase()}</a>`; }
+                else hint.innerHTML = `Pick from the list, or choose “➕ Add new ${S.word.toLowerCase()}…”.`;
             }
+            $('fin-doc').innerHTML = docOptions(side, p ? p.id : '', lastDocPick, editingId);
+            if ($('fin-doc').value !== lastDocPick) lastDocPick = $('fin-doc').value;
             hvFinPayKindChanged();
+        };
+        window.hvFinNewPartyFromTxn = function (useTyped) {
+            const side = formSide();
+            if (!side) return;
+            hvFinOpenPartyModal(side, null, 'txn', useTyped || !partyById(side, lastPartyPick) ? $('fin-party').value.trim() : '');
+        };
+        window.hvFinDocPicked = function () {
+            const sel = $('fin-doc');
+            if (sel.value === '__new') { sel.value = lastDocPick; hvFinNewDocFromTxn(); return; }
+            lastDocPick = sel.value;
+            hvFinUpdatePartyRecon();
+        };
+        window.hvFinNewDocFromTxn = function () {
+            const side = formSide();
+            const p = side ? partyById(side, $('fin-pty').value) : null;
+            if (!p) { alert(`Please pick the ${side ? SIDES[side].word.toLowerCase() : 'vendor / customer'} first.`); $('fin-pty').focus(); return; }
+            hvFinOpenDoc(null, { side, partyId: p.id, from: 'txn' });
         };
         window.hvFinPayKindChanged = function () {
             const adv = payKind() === 'advance';
-            $('finVinvGrid').style.display = adv ? 'none' : '';
-            const note = $('finAdvanceNote');
-            note.style.display = adv ? '' : 'none';
-            if (adv) {
-                const v = vendorById($('fin-vendor').value);
-                const st = v ? vendorStats(v.id, editingId) : null;
-                note.className = 'fin-recon';
-                note.innerHTML = `This payment is kept as an advance${v ? ' with <strong>' + esc(v.name) + '</strong>' : ''}. When their invoice comes, record that payment as <strong>Against invoice</strong> and put the advance used under <strong>Advance Adjusted</strong>.`
-                    + (st && st.advOpen > 0.009 ? `<br>Advance already with this vendor, not yet adjusted: <strong>${money(st.advOpen)}</strong>.` : '');
-            }
-            hvFinUpdateVendorRecon();
+            $('finDocRow').style.display = adv ? 'none' : '';
+            hvFinUpdatePartyRecon();
         };
-        window.hvFinUpdateVendorRecon = function () {
-            const el = $('finVendorRecon');
-            el.className = 'full-width fin-recon';
-            if (payKind() === 'advance') { el.textContent = ''; return; }
-            const v = vendorById($('fin-vendor').value);
-            const inv = amtVal('fin-vinv-amount');
-            const paid = amtVal('fin-amount') || 0, tds = amtVal('fin-vinv-tds') || 0, adv = amtVal('fin-vinv-adv') || 0;
-            const msgs = [];
-            let others = null;
-            const invNo = norm($('fin-vinv-no').value);
-            if (v && invNo) {
-                others = vendorStats(v.id, editingId).invoices.find(i => norm(i.no) === invNo) || null;
+        window.hvFinUpdatePartyRecon = function () {
+            const el = $('finPtyRecon');
+            if (!el) return;
+            el.className = 'fin-recon';
+            const side = formSide();
+            if (!side) { el.textContent = ''; return; }
+            const S = SIDES[side];
+            if (payKind() === 'advance') {
+                el.innerHTML = `Kept as an advance. When the invoice or PI comes, open this entry again, choose <strong>Against invoice / PI</strong> and pick it.`;
+                return;
             }
-            const otherTotal = others ? round2(others.paid + others.tds + others.adv) : 0;
-            const parts = [`Paid ${money(paid)}`];
-            if (tds) parts.push(`TDS ${money(tds)}`);
-            if (adv) parts.push(`advance ${money(adv)}`);
-            if (otherTotal) parts.push(`earlier payments on this invoice ${money(otherTotal)}`);
-            let cls = '';
-            if (inv) {
-                const gap = round2(inv - paid - tds - adv - otherTotal);
-                if (Math.abs(gap) < 0.01) { msgs.push(`✓ ${parts.join(' + ')} settles the invoice of ${money(inv)}.`); cls = 'ok'; }
-                else if (gap > 0) { msgs.push(`${parts.join(' + ')} leaves ${money(gap)} still to pay on this invoice.`); cls = 'gap'; }
-                else { msgs.push(`${parts.join(' + ')} is ${money(-gap)} more than the invoice amount.`); cls = 'gap'; }
-            } else if (otherTotal) {
-                msgs.push(`This invoice already has ${others.txns.length} payment${others.txns.length === 1 ? '' : 's'} (${money(otherTotal)} incl. TDS / advance).`);
-            }
-            if (adv && v) {
-                const open = vendorStats(v.id, editingId).advOpen;
-                if (adv - open > 0.009) { msgs.push(`⚠ Only ${money(Math.max(open, 0))} of advance is open with this vendor.`); cls = 'gap'; }
-            }
-            el.innerHTML = msgs.map(esc).join('<br>');
-            if (cls) el.className = 'full-width fin-recon ' + cls;
+            const d = docById($('fin-doc').value);
+            if (!d) { el.innerHTML = partyById(side, $('fin-pty').value) ? 'Pick the invoice / PI this is for, or add it with <strong>+ New</strong>.' : ''; return; }
+            const st = docStats(d, editingId);
+            const amt = amtVal('fin-amount') || 0;
+            const after = round2(st.balance - amt);
+            const parts = [`${esc(docTag(d))}: total ${money(st.total)}`];
+            if (st.tds) parts.push(`TDS ${money(st.tds)}`);
+            if (st.paid) parts.push(`earlier ${S.paidWord.toLowerCase()} ${money(st.paid)} (${st.pays.length})`);
+            parts.push(`this ${S.payWord} ${money(amt)}`);
+            let tail;
+            if (Math.abs(after) < 0.01) { tail = '✓ settles it.'; el.className = 'fin-recon ok'; }
+            else if (after > 0) { tail = `balance after this: <strong>${money(after)}</strong>.`; el.className = 'fin-recon gap'; }
+            else { tail = `${money(-after)} more than the balance.`; el.className = 'fin-recon gap'; }
+            el.innerHTML = parts.join(' · ') + ' → ' + tail + ` <a class="fin-vlink" onclick="hvFinOpenDoc('${d.id}')">Open invoice / PI</a>`;
         };
-        window.hvFinUpdateRecon = function () {
-            const el = $('finRecon');
-            const inv = amtVal('fin-inv-amount');
-            const rec = amtVal('fin-amount');
-            const tds = amtVal('fin-inv-tds') || 0;
-            if (!inv || rec === null) { el.textContent = ''; el.className = 'full-width fin-recon'; return; }
-            const gap = round2(inv - rec - tds);
-            if (Math.abs(gap) < 0.01) { el.textContent = `✓ Received ${money(rec)}${tds ? ' + TDS ' + money(tds) : ''} matches the invoice amount.`; el.className = 'full-width fin-recon ok'; }
-            else if (gap > 0) { el.textContent = `Received ${money(rec)}${tds ? ' + TDS ' + money(tds) : ''} is ${money(gap)} short of the invoice amount (part payment, or TDS not entered?).`; el.className = 'full-width fin-recon gap'; }
-            else { el.textContent = `Received ${money(rec)}${tds ? ' + TDS ' + money(tds) : ''} is ${money(-gap)} more than the invoice amount.`; el.className = 'full-width fin-recon gap'; }
-        };
+        window.hvFinUpdateRecon = function () { hvFinUpdatePartyRecon(); };
+        window.hvFinUpdateVendorRecon = function () { hvFinUpdatePartyRecon(); };
 
         function nextUncatId(afterId) {
             const list = baseFiltered().filter(isUncat).sort((a, b) => a.date !== b.date ? (ui.sortAsc ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1)) : (a.seq || 0) - (b.seq || 0));
@@ -6316,101 +6459,86 @@
             return next ? next.id : null;
         }
 
-        window.hvFinOpenTxnModal = function (id, focusInvoice) {
+        /* pre: { type, category, partyId, docId, payKind, amount, returnDoc } — used when opened from an invoice / PI */
+        window.hvFinOpenTxnModal = function (id, focusWhat, pre) {
             const t = id ? txns.find(x => x.id === id) : null;
+            pre = pre || {};
             editingId = t ? t.id : null;
+            txnReturnDoc = pre.returnDoc || null;
             $('finTxnForm').reset();
             $('finTxnTitle').textContent = t ? (t.category ? 'Edit Transaction' : 'Categorise Transaction') : 'Add Entry';
             $('finTxnSub').innerHTML = t
                 ? `${t.importFile ? 'Imported from <strong>' + esc(t.importFile) + '</strong>' : 'Added by hand'} · ${esc(fyOf(t.date))} ${esc(fyQuarterOf(t.date))}`
                 : 'Record a transaction by hand (cash, or one missing from the statement).';
             $('fin-date').value = t ? t.date : new Date().toISOString().slice(0, 10);
-            $('fin-type').value = t ? t.type : 'Debit';
-            $('fin-amount').value = t ? amtStr(t.amount) : '';
+            $('fin-type').value = pre.type || (t ? t.type : 'Debit');
+            $('fin-amount').value = t ? amtStr(t.amount) : (pre.amount ? amtStr(pre.amount) : '');
             $('fin-ref').value = t ? (t.refNo || '') : '';
             $('fin-account').value = t ? (t.account || '') : (imports.length ? (imports[imports.length - 1].account || '') : '');
             $('fin-narration').value = t ? (t.narration || '') : '';
-            $('fin-category').innerHTML = categoryOptions($('fin-type').value, t ? t.category : '');
+            const cat = pre.category || (t ? t.category : '');
+            $('fin-category').innerHTML = categoryOptions($('fin-type').value, cat);
             $('fin-party').value = t ? (t.party || '') : '';
-            $('fin-inv-no').value = t ? (t.invoiceNo || '') : '';
-            $('fin-inv-date').value = t ? (t.invoiceDate || '') : '';
-            $('fin-inv-amount').value = t ? amtStr(t.invoiceAmount) : '';
-            $('fin-inv-gst').value = t ? amtStr(t.gstAmount) : '';
-            $('fin-inv-tds').value = t ? amtStr(t.tdsAmount) : '';
             $('fin-bill-no').value = t ? (t.billNo || '') : '';
             $('fin-comments').value = t ? (t.comments || '') : '';
-            /* vendor payment fields */
-            const preVendor = t ? (vendorById(t.vendorId) || (t.type === 'Debit' ? vendorByName(t.party) : null)) : null;
-            lastVendorPick = preVendor ? preVendor.id : '';
-            $('fin-vendor').innerHTML = vendorOptions(lastVendorPick);
-            setPayKind(t ? t.payKind : 'invoice');
-            $('fin-vinv-no').value = t ? (t.billNo || '') : '';
-            $('fin-vinv-date').value = t ? (t.billDate || '') : '';
-            $('fin-vinv-amount').value = t ? amtStr(t.billAmount) : '';
-            $('fin-vinv-gst').value = t ? amtStr(t.billGst) : '';
-            $('fin-vinv-tds').value = t ? amtStr(t.billTds) : '';
-            $('fin-vinv-adv').value = t ? amtStr(t.advAdjusted) : '';
+            /* vendor / customer fields */
+            const side0 = sideOfCat($('fin-type').value, cat);
+            lastPartyPick = pre.partyId || (t ? (t.vendorId || t.customerId || '') : '');
+            if (!partyById(side0, lastPartyPick) && t && side0) { const p = partyByName(side0, t.party); lastPartyPick = p ? p.id : ''; }
+            lastDocPick = pre.docId || (t ? (t.docId || '') : '');
+            $('fin-pty').dataset.side = '';
+            setPayKind(pre.payKind || (t && t.payKind) || (cat === 'Advance from Customer' ? 'advance' : 'invoice'));
             hvFinTypeChanged();
-            if (t) $('fin-category').value = t.category || '';
+            $('fin-category').value = cat || '';
             hvFinCategoryChanged();
             $('finDeleteBtn').style.display = t ? '' : 'none';
-            $('finSaveNextBtn').style.display = (t && nextUncatId(t.id)) ? '' : 'none';
+            $('finSaveNextBtn').style.display = (t && !txnReturnDoc && nextUncatId(t.id)) ? '' : 'none';
             $('finTxnModal').style.display = 'block';
-            setTimeout(() => { (focusInvoice === 'vendor' ? $('fin-vendor') : focusInvoice ? $('fin-inv-no') : (t ? $('fin-category') : $('fin-amount'))).focus(); }, 30);
+            softFocus('finTxnModal', focusWhat === 'party' ? $('fin-pty') : (t || pre.category) ? (pre.docId ? $('fin-amount') : $('fin-category')) : $('fin-amount'));
         };
-        window.hvFinCloseTxnModal = function () { $('finTxnModal').style.display = 'none'; editingId = null; };
+        window.hvFinCloseTxnModal = function (keepReturn) {
+            $('finTxnModal').style.display = 'none';
+            editingId = null;
+            const back = txnReturnDoc; txnReturnDoc = null;
+            if (back && !keepReturn && docById(back)) hvFinOpenDoc(back);
+        };
 
         window.hvFinSaveTxn = function (goNext) {
             const date = $('fin-date').value;
             const amount = amtVal('fin-amount');
             const type = $('fin-type').value;
             const category = $('fin-category').value;
-            const isSales = type === 'Credit' && category === 'Sales';
-            const vendorMode = isVendorCat(type, category);
-            const vendor = vendorMode ? vendorById($('fin-vendor').value) : null;
-            const kind = vendorMode ? payKind() : '';
-            const onInvoice = vendorMode && kind === 'invoice';
-            const advAdjusted = onInvoice ? amtVal('fin-vinv-adv') : null;
+            const side = sideOfCat(type, category);
+            const S = side ? SIDES[side] : null;
+            const party = side ? partyById(side, $('fin-pty').value) : null;
+            const kind = side ? payKind() : '';
+            let doc = side && kind === 'invoice' ? docById($('fin-doc').value) : null;
+            if (doc && (!party || doc.partyId !== party.id || doc.side !== side)) doc = null;
             if (!date) { alert('Please enter the transaction date.'); return; }
-            /* ₹0 is allowed only for an invoice settled fully from an earlier advance (no money left the bank) */
-            if (!amount && !(onInvoice && advAdjusted > 0 && amount === 0)) {
-                alert(onInvoice ? 'Please enter the amount paid. (If the invoice was settled fully from an earlier advance, enter 0 and fill in Advance Adjusted.)' : 'Please enter an amount greater than zero.');
-                return;
-            }
-            if (vendorMode && kind === 'advance' && !vendor) { alert('Please pick the vendor this advance was paid to, so it can be adjusted against their invoices later.'); $('fin-vendor').focus(); return; }
-            if (onInvoice && advAdjusted > 0) {
-                if (!vendor) { alert('Please pick the vendor whose advance is being adjusted.'); $('fin-vendor').focus(); return; }
-                const open = vendorStats(vendor.id, editingId).advOpen;
-                if (advAdjusted - open > 0.009 && !confirm(`Advance Adjusted is ${money(advAdjusted)}, but only ${money(Math.max(open, 0))} of advance is open with ${vendor.name}.\n\nSave anyway?`)) return;
-            }
+            if (!amount) { alert('Please enter an amount greater than zero.'); return; }
+            if (side && kind === 'advance' && !party) { alert(`Please pick the ${S.word.toLowerCase()} for this advance, so it can be linked to their invoice later.`); $('fin-pty').focus(); return; }
+            const old = editingId ? txns.find(x => x.id === editingId) : null;
+            /* an older entry with invoice details typed on it: turn them into an invoice record now */
+            if (side && party && kind === 'invoice' && !doc && old) doc = legacyDocFor(old, side, party.id);
             const fields = {
-                date, type, amount: amount || 0,
+                date, type, amount,
                 refNo: $('fin-ref').value.trim(),
                 account: $('fin-account').value.trim(),
                 narration: $('fin-narration').value.trim(),
                 category,
-                party: vendor ? vendor.name : $('fin-party').value.trim(),
-                invoiceNo: isSales ? $('fin-inv-no').value.trim() : '',
-                invoiceDate: isSales ? $('fin-inv-date').value : '',
-                invoiceAmount: isSales ? amtVal('fin-inv-amount') : null,
-                gstAmount: isSales ? amtVal('fin-inv-gst') : null,
-                tdsAmount: isSales ? amtVal('fin-inv-tds') : null,
-                billNo: type !== 'Debit' ? '' : (vendorMode ? (onInvoice ? $('fin-vinv-no').value.trim() : '') : $('fin-bill-no').value.trim()),
-                vendorId: vendor ? vendor.id : '',
-                payKind: vendorMode ? kind : '',
-                billDate: onInvoice ? $('fin-vinv-date').value : '',
-                billAmount: onInvoice ? amtVal('fin-vinv-amount') : null,
-                billGst: onInvoice ? amtVal('fin-vinv-gst') : null,
-                billTds: onInvoice ? amtVal('fin-vinv-tds') : null,
-                advAdjusted,
+                party: party ? party.name : $('fin-party').value.trim(),
+                vendorId: side === 'purchase' && party ? party.id : '',
+                customerId: side === 'sales' && party ? party.id : '',
+                payKind: kind,
+                docId: doc ? doc.id : '',
+                billNo: type === 'Debit' && !side ? $('fin-bill-no').value.trim() : '',
                 comments: $('fin-comments').value.trim(),
                 updatedAt: new Date().toISOString()
             };
+            if (side && party) Object.assign(fields, LEGACY_CLEAR);
             let savedId = editingId;
-            if (editingId) {
-                const t = txns.find(x => x.id === editingId);
-                if (t) Object.assign(t, fields);
-            } else {
+            if (old) Object.assign(old, fields);
+            else {
                 const t = Object.assign({ id: newId(), seq: Date.now(), source: 'manual', importId: null, importFile: '', createdAt: new Date().toISOString() }, fields);
                 txns.push(t); savedId = t.id;
             }
@@ -6418,7 +6546,7 @@
             const nextId = goNext ? nextUncatId(savedId) : null;
             hvFinCloseTxnModal();
             hvRenderFinance();
-            refreshVendorsWindow();
+            refreshFinWindows();
             if (nextId) hvFinOpenTxnModal(nextId);
         };
 
@@ -6431,17 +6559,72 @@
             save();
             if ($('finTxnModal').style.display === 'block') hvFinCloseTxnModal();
             hvRenderFinance();
-            refreshVendorsWindow();
+            refreshFinWindows();
         };
 
-        /* ---------- vendors: add / edit ---------- */
-        let vendorEditId = null, vendorFrom = '';
-        window.hvFinOpenVendorModal = function (id, from, prefillName) {
-            const v = vendorById(id);
-            vendorEditId = v ? v.id : null;
-            vendorFrom = from || '';
+        /* ---------- older entries: invoice details that were typed on the bank entry itself ---------- */
+        const LEGACY_CLEAR = { invoiceNo: '', invoiceDate: '', invoiceAmount: null, gstAmount: null, tdsAmount: null, billDate: '', billAmount: null, billGst: null, billTds: null };
+        function legacyDocFor(t, side, pid) {
+            const no = side === 'purchase' ? t.billNo : t.invoiceNo;
+            if (!no) return null;
+            const n = norm(no);
+            let d = docs.find(x => x.side === side && x.partyId === pid && norm(x.no) === n);
+            const total = side === 'purchase' ? t.billAmount : t.invoiceAmount;
+            const gst = side === 'purchase' ? t.billGst : t.gstAmount;
+            const tds = side === 'purchase' ? t.billTds : t.tdsAmount;
+            const now = new Date().toISOString();
+            if (!d) {
+                d = { id: newId('doc_'), side, kind: 'Invoice', partyId: pid, no: String(no).trim(), date: (side === 'purchase' ? t.billDate : t.invoiceDate) || t.date, dueDate: '',
+                    taxable: total != null && gst != null ? round2(num(total) - num(gst)) : null, gst: gst == null ? null : gst, total: total == null ? null : total,
+                    tdsRate: null, tds: null, tdsDeposit: '', tdsPenalty: null, client: '', via: '', description: '', notes: 'Made from the invoice details typed on a bank entry',
+                    piNo: '', piDate: '', createdAt: now, updatedAt: now };
+                docs.push(d);
+            } else {
+                if ((d.total == null || d.total === '') && total != null) d.total = total;
+                if ((d.gst == null || d.gst === '') && gst != null) d.gst = gst;
+            }
+            if (num(tds)) d.tds = round2(num(d.tds) + num(tds));
+            saveDocs();
+            return d;
+        }
+        /* Runs once the cloud copy is in (so the result is uploaded): links older entries to vendor / customer and invoice records */
+        let migrated = false;
+        function migrateLegacy() {
+            if (migrated) return;
+            if (window.hvCloud && !window.hvCloud.armed) return;
+            migrated = true;
+            let ch = false, chC = false;
+            const now = new Date().toISOString();
+            txns.forEach(t => {
+                const side = sideOfTxn(t);
+                if (side === 'sales' && !t.customerId && t.party) {
+                    let c = partyByName('sales', t.party);
+                    if (!c) { c = { id: newId('cus_'), name: t.party.trim().replace(/\s+/g, ' '), gstin: '', pan: '', contactPerson: '', phone: '', email: '', supplies: '', address: '', notes: '', tdsRate: null, createdAt: now, updatedAt: now }; customers.push(c); chC = true; }
+                    t.customerId = c.id; t.party = c.name; ch = true;
+                }
+                if (side && !t.payKind && (t.vendorId || t.customerId)) { t.payKind = t.category === 'Advance from Customer' ? 'advance' : 'invoice'; ch = true; }
+                const pid = side ? (side === 'purchase' ? t.vendorId : t.customerId) : '';
+                if (side && pid && partyById(side, pid) && t.payKind !== 'advance' && !t.docId && (side === 'purchase' ? t.billNo : t.invoiceNo)) {
+                    const d = legacyDocFor(t, side, pid);
+                    if (d) { t.docId = d.id; Object.assign(t, LEGACY_CLEAR, side === 'purchase' ? { billNo: '' } : {}); ch = true; }
+                }
+            });
+            if (chC) saveCustomers();
+            if (ch) save();
+        }
+
+        /* ---------- vendors / customers: add / edit ---------- */
+        let pm = { side: 'purchase', id: null, from: '' };
+        window.hvFinOpenPartyModal = function (side, id, from, prefillName) {
+            const S = SIDES[side];
+            const v = partyById(side, id);
+            pm = { side, id: v ? v.id : null, from: from || '' };
             $('finVendorForm').reset();
-            $('finVendorTitle').textContent = v ? 'Edit Vendor' : 'Add Vendor';
+            $('finVendorTitle').textContent = (v ? 'Edit ' : 'Add ') + S.word;
+            $('fvNameLabel').textContent = S.word + ' Name *';
+            $('fvTypeLabel').textContent = side === 'purchase' ? 'What they supply' : 'Type of business';
+            $('fvSaveBtn').textContent = 'Save ' + S.word;
+            $('fv-name').setAttribute('list', side === 'sales' ? 'finPartyList' : '');
             $('fv-name').value = v ? v.name : (prefillName || '');
             $('fv-gstin').value = v ? (v.gstin || '') : '';
             $('fv-pan').value = v ? (v.pan || '') : '';
@@ -6449,14 +6632,16 @@
             $('fv-phone').value = v ? (v.phone || '') : '';
             $('fv-email').value = v ? (v.email || '') : '';
             $('fv-type').value = v ? (v.supplies || '') : '';
+            $('fv-tds-rate').value = v && v.tdsRate != null ? v.tdsRate : '';
             $('fv-address').value = v ? (v.address || '') : '';
             $('fv-notes').value = v ? (v.notes || '') : '';
             hvFinGstinInput($('fv-gstin'), true);
             $('fvDeleteBtn').style.display = v ? '' : 'none';
             $('finVendorModal').style.display = 'block';
-            setTimeout(() => $(v || prefillName ? 'fv-gstin' : 'fv-name').focus(), 30);
+            softFocus('finVendorModal', $(v || prefillName ? 'fv-gstin' : 'fv-name'));
         };
-        window.hvFinCloseVendorModal = function () { $('finVendorModal').style.display = 'none'; vendorEditId = null; };
+        window.hvFinOpenVendorModal = function (id, from, prefill) { hvFinOpenPartyModal('purchase', id, from, prefill); };
+        window.hvFinCloseVendorModal = function () { $('finVendorModal').style.display = 'none'; };
         window.hvFinGstinInput = function (el, quiet) {
             el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
             const g = el.value, hint = $('fvGstinHint');
@@ -6470,199 +6655,665 @@
             } else { hint.className = 'fin-vendor-hint warn'; hint.textContent = '⚠ This does not look like a valid GSTIN — please check it.'; }
         };
         window.hvFinSaveVendor = function () {
+            const { side, from } = pm;
+            const S = SIDES[side];
+            const list = S.list();
             const name = $('fv-name').value.trim().replace(/\s+/g, ' ');
-            if (!name) { alert('Please enter the vendor name.'); $('fv-name').focus(); return; }
+            if (!name) { alert(`Please enter the ${S.word.toLowerCase()} name.`); $('fv-name').focus(); return; }
             const gstin = $('fv-gstin').value.trim().toUpperCase();
             const pan = $('fv-pan').value.trim().toUpperCase();
-            const sameName = vendors.find(v => v.id !== vendorEditId && norm(v.name) === norm(name));
-            if (sameName) { alert(`A vendor called "${sameName.name}" already exists. Pick it from the list instead.`); return; }
-            const sameGst = gstin && vendors.find(v => v.id !== vendorEditId && v.gstin === gstin);
+            const sameName = list.find(v => v.id !== pm.id && norm(v.name) === norm(name));
+            if (sameName) { alert(`A ${S.word.toLowerCase()} called "${sameName.name}" already exists. Pick it from the list instead.`); return; }
+            const sameGst = gstin && list.find(v => v.id !== pm.id && v.gstin === gstin);
             if (sameGst) { alert(`GSTIN ${gstin} is already saved for "${sameGst.name}".`); return; }
             if (gstin && !GSTIN_RE.test(gstin) && !confirm(`"${gstin}" does not look like a valid 15-character GSTIN.\n\nSave anyway?`)) return;
             if (pan && !/^[A-Z]{5}\d{4}[A-Z]$/.test(pan) && !confirm(`"${pan}" does not look like a valid PAN.\n\nSave anyway?`)) return;
+            const rate = parseFloat($('fv-tds-rate').value);
             const now = new Date().toISOString();
             const fields = {
                 name, gstin, pan,
                 contactPerson: $('fv-contact').value.trim(), phone: $('fv-phone').value.trim(), email: $('fv-email').value.trim(),
-                supplies: $('fv-type').value.trim(), address: $('fv-address').value.trim(), notes: $('fv-notes').value.trim(), updatedAt: now
+                supplies: $('fv-type').value.trim(), tdsRate: isFinite(rate) ? rate : null,
+                address: $('fv-address').value.trim(), notes: $('fv-notes').value.trim(), updatedAt: now
             };
-            let v = vendorById(vendorEditId);
+            let v = partyById(side, pm.id);
             if (v) {
                 const renamed = v.name !== name;
                 Object.assign(v, fields);
-                if (renamed) {   /* keep the "Paid To" name on its payments in step */
+                if (renamed) {   /* keep the name on its bank entries in step */
                     let n = 0;
-                    txns.forEach(t => { if (t.vendorId === v.id && t.party !== name) { t.party = name; n++; } });
+                    txns.forEach(t => { if (t[S.idField] === v.id && t.party !== name) { t.party = name; n++; } });
                     if (n) save();
                 }
             } else {
-                v = Object.assign({ id: newId('ven_'), createdAt: now }, fields);
-                vendors.push(v);
+                v = Object.assign({ id: newId(S.prefix), createdAt: now }, fields);
+                list.push(v);
             }
-            saveVendors();
-            const from = vendorFrom;
+            S.save();
             hvFinCloseVendorModal();
-            if (from === 'txn' && $('finTxnModal').style.display === 'block') {
-                $('fin-vendor').innerHTML = vendorOptions(v.id);
-                hvFinVendorPicked();
+            if (from === 'txn' && $('finTxnModal').style.display === 'block' && formSide() === side) {
+                lastPartyPick = v.id;
+                $('fin-pty').innerHTML = partyOptions(side, v.id);
+                hvFinPartyPicked();
+            }
+            if (from === 'doc' && $('finDocModal').style.display === 'block' && dm.side === side) {
+                $('fd-party').innerHTML = partyOptions(side, v.id);
+                hvFinDocPartyPicked();
             }
             hvRenderFinance();
-            refreshVendorsWindow();
+            refreshFinWindows();
         };
         window.hvFinDeleteVendor = function () {
-            const v = vendorById(vendorEditId);
+            const { side } = pm;
+            const S = SIDES[side];
+            const v = partyById(side, pm.id);
             if (!v) return;
-            const linked = txns.filter(t => t.vendorId === v.id).length;
-            if (linked) { alert(`"${v.name}" has ${linked} payment${linked === 1 ? '' : 's'} linked to it, so it cannot be deleted.\n\nChange the vendor on those payments first if this vendor was added by mistake.`); return; }
-            if (!confirm(`Delete vendor "${v.name}"?`)) return;
-            vendors = vendors.filter(x => x.id !== v.id);
-            saveVendors();
+            const linked = txns.filter(t => t[S.idField] === v.id).length;
+            const ndocs = docs.filter(d => d.side === side && d.partyId === v.id).length;
+            if (linked || ndocs) { alert(`"${v.name}" has ${linked ? linked + ' bank entr' + (linked === 1 ? 'y' : 'ies') : ''}${linked && ndocs ? ' and ' : ''}${ndocs ? ndocs + ' invoice' + (ndocs === 1 ? '' : 's') + ' / PIs' : ''} linked, so it cannot be deleted.`); return; }
+            if (!confirm(`Delete ${S.word.toLowerCase()} "${v.name}"?`)) return;
+            const list = S.list();
+            list.splice(list.indexOf(v), 1);
+            S.save();
             hvFinCloseVendorModal();
-            if (venView.id === v.id) venView.id = null;
-            if ($('finTxnModal').style.display === 'block') { $('fin-vendor').innerHTML = vendorOptions(''); hvFinVendorPicked(); }
+            if (pv.id === v.id) pv.id = null;
+            if ($('finTxnModal').style.display === 'block' && formSide() === side) { lastPartyPick = ''; $('fin-pty').innerHTML = partyOptions(side, ''); hvFinPartyPicked(); }
             hvRenderFinance();
-            refreshVendorsWindow();
+            refreshFinWindows();
         };
 
-        /* ---------- vendors: list + ledger window ---------- */
-        const venView = { id: null, q: '' };
-        function refreshVendorsWindow() { if ($('finVendorsModal').style.display === 'block') renderVendors(); }
-        window.hvFinOpenVendors = function (id) {
-            venView.id = vendorById(id) ? id : null;
-            $('finVendorsModal').style.display = 'block';
-            renderVendors();
+        function refreshFinWindows() {
+            if ($('finPartiesModal').style.display === 'block') renderParties();
+            if ($('finDocsModal').style.display === 'block') renderDocs();
+            if ($('finDocModal').style.display === 'block' && dm.id) renderDocHistory();
+        }
+
+        /* ---------- Vendors & Customers window: list + ledger ---------- */
+        const pv = { side: 'purchase', id: null, q: '' };
+        window.hvFinOpenParties = function (side, id) {
+            pv.side = side === 'sales' ? 'sales' : 'purchase';
+            pv.id = partyById(pv.side, id) ? id : null;
+            $('finPartiesModal').style.display = 'block';
+            renderParties();
         };
-        window.hvFinCloseVendors = function () { $('finVendorsModal').style.display = 'none'; };
-        window.hvFinVendorsBack = function () { venView.id = null; renderVendors(); };
-        window.hvFinVendorsSearch = function (el) { venView.q = el.value; renderVendors(true); };
-        window.hvFinShowVendorInList = function (id) {
-            hvFinCloseVendors();
+        window.hvFinOpenVendors = function (id) { hvFinOpenParties('purchase', id); };
+        window.hvFinCloseParties = function () { $('finPartiesModal').style.display = 'none'; };
+        window.hvFinPartiesTab = function (side) { pv.side = side; pv.id = null; renderParties(); };
+        window.hvFinPartiesBack = function () { pv.id = null; renderParties(); };
+        window.hvFinPartiesSearch = function (el) { pv.q = el.value; renderParties(true); };
+        window.hvFinShowPartyInList = function (side, id) {
+            hvFinCloseParties(); hvFinCloseDocs();
             if (window.hvSwitchSection) hvSwitchSection('finance');
             ui.view = 'all'; ui.period = 'all'; saveUI();
             $('finPeriod').value = 'all'; $('finCustomRange').style.display = 'none';
             $('finCategoryFilter').value = ''; $('finSearch').value = '';
             refreshFilterOptions();
-            $('finVendorFilter').value = id;
+            $('finVendorFilter').value = side + ':' + id;
             hvRenderFinance();
         };
 
-        function renderVendors(keepFocus) {
-            const box = $('finVendorsBody');
-            const v = vendorById(venView.id);
-            if (v) { box.innerHTML = ledgerHtml(v); return; }
-            const q = venView.q.trim().toLowerCase();
-            const rows = sortedVendors().map(x => ({ v: x, st: vendorStats(x.id) }))
+        function renderParties(keepFocus) {
+            const box = $('finPartiesBody');
+            const side = pv.side, S = SIDES[side];
+            const tabs = `<div class="fin-doc-tabs">
+                <button type="button" class="fin-doc-tab${side === 'purchase' ? ' active' : ''}" onclick="hvFinPartiesTab('purchase')">🏢 Vendors (${vendors.length})</button>
+                <button type="button" class="fin-doc-tab${side === 'sales' ? ' active' : ''}" onclick="hvFinPartiesTab('sales')">🤝 Customers (${customers.length})</button></div>`;
+            const v = partyById(side, pv.id);
+            if (v) { box.innerHTML = ledgerHtml(side, v); return; }
+            const q = pv.q.trim().toLowerCase();
+            const rows = sortedParties(side).map(x => ({ v: x, st: partyStats(side, x.id) }))
                 .filter(r => !q || [r.v.name, r.v.gstin, r.v.pan, r.v.supplies, r.v.contactPerson, r.v.phone].join(' ').toLowerCase().includes(q));
-            const tot = rows.reduce((a, r) => ({ paid: a.paid + r.st.paid, tds: a.tds + r.st.tds, adv: a.adv + Math.max(r.st.advOpen, 0), due: a.due + r.st.due, n: a.n + r.st.count }), { paid: 0, tds: 0, adv: 0, due: 0, n: 0 });
-            const missing = txns.filter(t => t.type === 'Debit' && FIN_VENDOR_REQUIRED.includes(t.category) && !vendorById(t.vendorId)).length;
+            const tot = rows.reduce((a, r) => ({ paid: a.paid + r.st.paid, tds: a.tds + r.st.tds, adv: a.adv + Math.max(r.st.advOpen, 0), due: a.due + r.st.due, inv: a.inv + r.st.invoiced, n: a.n + r.st.count }), { paid: 0, tds: 0, adv: 0, due: 0, inv: 0, n: 0 });
+            const missing = txns.filter(t => sideOfTxn(t) === side && (side === 'sales' || FIN_VENDOR_REQUIRED.includes(t.category)) && !partyOfTxn(t)).length;
             box.innerHTML = `
                 <div class="fin-vhead">
-                    <h2>🏢 Vendors <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">(${vendors.length})</span></h2>
-                    <input type="text" id="finVenSearch" placeholder="🔍 Name, GSTIN, PAN…" value="${esc(venView.q)}" oninput="hvFinVendorsSearch(this)">
-                    <button type="button" class="btn-add-lead" onclick="hvFinOpenVendorModal(null, 'list')">+ Add Vendor</button>
+                    <h2>${side === 'purchase' ? '🏢 Vendors' : '🤝 Customers'}</h2>
+                    <input type="text" id="finVenSearch" placeholder="🔍 Name, GSTIN, PAN…" value="${esc(pv.q)}" oninput="hvFinPartiesSearch(this)">
+                    <button type="button" class="btn-add-lead" onclick="hvFinOpenPartyModal('${side}', null, 'list')">+ Add ${S.word}</button>
                 </div>
-                ${missing ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${missing} payment${missing === 1 ? '' : 's'} under Vendor / Contractor, Purchases or Professional Fees ${missing === 1 ? 'has' : 'have'} no vendor yet. They are marked “⚠ Vendor not set” in the list.</div>` : ''}
-                ${!vendors.length ? `<div class="fin-empty" style="padding:28px;">No vendors yet. Click <strong>+ Add Vendor</strong>, or pick “➕ Add new vendor…” while categorising a payment.</div>` : `
-                <div class="table-container" style="max-height: 62vh;">
+                ${tabs}
+                ${missing ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${missing} bank entr${missing === 1 ? 'y has' : 'ies have'} no ${S.word.toLowerCase()} yet. They are marked “⚠ ${S.word} not set” in the list.</div>` : ''}
+                ${!S.list().length ? `<div class="fin-empty" style="padding:28px;">No ${S.words.toLowerCase()} yet. Click <strong>+ Add ${S.word}</strong>.</div>` : `
+                <div class="table-container" style="max-height: 60vh;">
                     <table class="fin-vtable">
-                        <thead><tr><th>Vendor</th><th>GSTIN</th><th class="num">Payments</th><th class="num">Total Paid</th><th class="num">TDS Deducted</th><th class="num">Advance not adjusted</th><th class="num">Invoice balance due</th><th>Last paid</th></tr></thead>
+                        <thead><tr><th>${S.word}</th><th>GSTIN</th><th class="num">Entries</th><th class="num">Invoiced</th><th class="num">${S.paidWord}</th><th class="num">TDS</th><th class="num">Balance due</th><th class="num">Advance not linked</th><th>Last ${S.payWord}</th></tr></thead>
                         <tbody>
-                        ${rows.map(({ v, st }) => `<tr class="fin-vrow" onclick="hvFinOpenVendors('${v.id}')">
+                        ${rows.map(({ v, st }) => `<tr class="fin-vrow" onclick="hvFinOpenParties('${side}', '${v.id}')">
                             <td><span class="fin-vname">${esc(v.name)}</span>${v.supplies ? `<span class="fin-vsub">${esc(v.supplies)}</span>` : ''}</td>
                             <td>${esc(v.gstin) || '<span style="color:var(--text-muted)">—</span>'}</td>
                             <td class="num">${st.count || ''}</td>
+                            <td class="num">${st.invoiced ? money(st.invoiced) : ''}</td>
                             <td class="num">${st.count ? money(st.paid) : ''}</td>
                             <td class="num">${st.tds ? money(st.tds) : ''}</td>
-                            <td class="num">${st.advOpen > 0.009 ? `<span style="color:#b45309;font-weight:700;">${money(st.advOpen)}</span>` : ''}</td>
                             <td class="num">${st.due > 0.009 ? `<span class="fin-bal-due">${money(st.due)}</span>` : ''}</td>
+                            <td class="num">${st.advOpen > 0.009 ? `<span style="color:#b45309;font-weight:700;">${money(st.advOpen)}</span>` : ''}</td>
                             <td>${st.last ? esc(fmtDate(st.last)) : ''}</td>
-                        </tr>`).join('') || '<tr><td colspan="8" class="fin-empty">No vendor matches the search.</td></tr>'}
-                        ${rows.length > 1 ? `<tr class="fin-vtotal"><td colspan="2">Total</td><td class="num">${tot.n}</td><td class="num">${money(tot.paid)}</td><td class="num">${money(tot.tds)}</td><td class="num">${money(tot.adv)}</td><td class="num">${money(tot.due)}</td><td></td></tr>` : ''}
+                        </tr>`).join('') || `<tr><td colspan="9" class="fin-empty">No ${S.word.toLowerCase()} matches the search.</td></tr>`}
+                        ${rows.length > 1 ? `<tr class="fin-vtotal"><td colspan="2">Total</td><td class="num">${tot.n}</td><td class="num">${money(tot.inv)}</td><td class="num">${money(tot.paid)}</td><td class="num">${money(tot.tds)}</td><td class="num">${money(tot.due)}</td><td class="num">${money(tot.adv)}</td><td></td></tr>` : ''}
                         </tbody>
                     </table>
                 </div>`}`;
             if (keepFocus) { const s = $('finVenSearch'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
         }
 
-        function ledgerHtml(v) {
-            const st = vendorStats(v.id);
+        function ledgerHtml(side, v) {
+            const S = SIDES[side];
+            const st = partyStats(side, v.id);
             const details = [
                 v.gstin && `GSTIN <strong>${esc(v.gstin)}</strong>`, v.pan && `PAN <strong>${esc(v.pan)}</strong>`,
-                v.supplies && `Supplies: ${esc(v.supplies)}`, v.contactPerson && `Contact: ${esc(v.contactPerson)}`,
+                v.supplies && esc(v.supplies), v.tdsRate != null && `Usual TDS ${esc(v.tdsRate)}%`, v.contactPerson && `Contact: ${esc(v.contactPerson)}`,
                 v.phone && `📞 <a href="tel:${esc(v.phone.replace(/[^\d+]/g, ''))}" style="color:inherit;">${esc(v.phone)}</a>`,
                 v.email && `✉️ <a href="mailto:${esc(v.email)}" style="color:inherit;">${esc(v.email)}</a>`
             ].filter(Boolean).join(' · ');
             const pays = st.pays.slice().sort((a, b) => a.date !== b.date ? (a.date < b.date ? 1 : -1) : (b.seq || 0) - (a.seq || 0));
-            const invRows = st.invoices.filter(i => i.no || i.amount != null);
-            const noInv = st.invoices.filter(i => !i.no && i.amount == null).reduce((n, i) => n + i.txns.length, 0);
+            const dl = st.docs.slice().sort((a, b) => (b.d.date || '').localeCompare(a.d.date || ''));
             return `
+                <div class="fin-vhead"><button type="button" class="fin-back" onclick="hvFinPartiesBack()">← All ${S.words.toLowerCase()}</button></div>
                 <div class="fin-vhead">
-                    <button type="button" class="fin-back" onclick="hvFinVendorsBack()">← All vendors</button>
+                    <h2>${S.icon} ${esc(v.name)}</h2>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenDoc(null, { side: '${side}', partyId: '${v.id}' })">+ Invoice / PI</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenPartyModal('${side}', '${v.id}', 'ledger')">✏️ Edit</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinShowPartyInList('${side}', '${v.id}')" title="Show only this ${S.word.toLowerCase()}'s bank entries in the Finance list">🔎 Show in list</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinExportParty('${side}', '${v.id}')">⬇️ Export</button>
                 </div>
-                <div class="fin-vhead">
-                    <h2>🏢 ${esc(v.name)}</h2>
-                    <button type="button" class="theme-toggle-btn" onclick="hvFinOpenVendorModal('${v.id}', 'ledger')">✏️ Edit vendor</button>
-                    <button type="button" class="theme-toggle-btn" onclick="hvFinShowVendorInList('${v.id}')" title="Show only this vendor's payments in the Finance list">🔎 Show in list</button>
-                    <button type="button" class="theme-toggle-btn" onclick="hvFinExportVendor('${v.id}')">⬇️ Export</button>
-                </div>
-                <div class="fin-vdetails">${details || 'No GSTIN or contact details yet. Click ✏️ Edit vendor to add them.'}
+                <div class="fin-vdetails">${details || 'No GSTIN or contact details yet. Click ✏️ Edit to add them.'}
                     ${v.address ? `<br>${esc(v.address)}` : ''}${v.notes ? `<br><em>${esc(v.notes)}</em>` : ''}</div>
                 <div class="fin-summary">
-                    <span class="fin-chip">Payments <strong>${st.count}</strong></span>
-                    <span class="fin-chip debit">Paid from bank <strong>${money(st.paid)}</strong></span>
-                    <span class="fin-chip">Invoices <strong>${money(st.invoiced)}</strong>${st.gst ? ` (GST ${money(st.gst)})` : ''}</span>
-                    <span class="fin-chip">TDS deducted <strong>${money(st.tds)}</strong></span>
-                    <span class="fin-chip${st.advOpen > 0.009 ? ' warn' : ''}">Advances <strong>${money(st.advPaid)}</strong> · adjusted ${money(st.advAdj)} · open <strong>${money(st.advOpen)}</strong></span>
+                    <span class="fin-chip">Invoiced <strong>${money(st.invoiced)}</strong>${st.gst ? ` (GST ${money(st.gst)})` : ''}</span>
+                    <span class="fin-chip">TDS <strong>${money(st.tds)}</strong></span>
+                    <span class="fin-chip ${side === 'sales' ? 'credit' : 'debit'}">${S.paidWord} <strong>${money(st.paid)}</strong> (${st.count})</span>
                     <span class="fin-chip${st.due > 0.009 ? ' debit' : ' credit'}">Invoice balance due <strong>${money(st.due)}</strong></span>
+                    ${st.piOpen > 0.009 ? `<span class="fin-chip">PIs not yet ${side === 'sales' ? 'received' : 'paid'} <strong>${money(st.piOpen)}</strong></span>` : ''}
+                    ${st.advOpen > 0.009 ? `<span class="fin-chip warn">Advance not linked to an invoice <strong>${money(st.advOpen)}</strong></span>` : ''}
                 </div>
 
-                <div class="fin-vsection">🧾 Invoices</div>
-                ${invRows.length ? `<div class="table-container" style="max-height: 30vh;"><table class="fin-vtable">
-                    <thead><tr><th>Invoice No</th><th>Invoice Date</th><th class="num">Amount</th><th class="num">GST</th><th class="num">Paid</th><th class="num">TDS</th><th class="num">Advance adj.</th><th class="num">Balance</th></tr></thead>
-                    <tbody>${invRows.map(i => `<tr>
-                        <td>${esc(i.no) || '<span style="color:var(--text-muted)">(no number)</span>'}</td>
-                        <td>${i.date ? esc(fmtDate(i.date)) : ''}</td>
-                        <td class="num">${i.amount != null ? money(i.amount) : '<span style="color:var(--text-muted)">not entered</span>'}</td>
-                        <td class="num">${i.gst ? money(i.gst) : ''}</td>
-                        <td class="num">${money(i.paid)}${i.txns.length > 1 ? ` <span class="fin-vsub">${i.txns.length} payments</span>` : ''}</td>
-                        <td class="num">${i.tds ? money(i.tds) : ''}</td>
-                        <td class="num">${i.adv ? money(i.adv) : ''}</td>
-                        <td class="num">${i.balance == null ? '' : Math.abs(i.balance) < 0.01 ? '<span class="fin-bal-ok">✓ Settled</span>' : i.balance > 0 ? `<span class="fin-bal-due">${money(i.balance)}</span>` : `<span style="color:#b45309;font-weight:700;">${money(-i.balance)} extra</span>`}</td>
-                    </tr>`).join('')}</tbody></table></div>` : '<div class="fin-modal-sub">No invoice details recorded yet.</div>'}
-                ${noInv ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${noInv} payment${noInv === 1 ? '' : 's'} marked “against invoice” ${noInv === 1 ? 'has' : 'have'} no invoice details. Open ${noInv === 1 ? 'it' : 'them'} below to add them.</div>` : ''}
+                <div class="fin-vsection">🧾 Invoices / PIs (click to open)</div>
+                ${dl.length ? `<div class="table-container" style="max-height: 32vh;"><table class="fin-vtable">
+                    <thead><tr><th>No</th><th>Date</th><th>Client / Project</th><th class="num">Amount</th><th class="num">GST</th><th class="num">Total</th><th class="num">TDS</th><th class="num">${S.paidWord}</th><th class="num">Balance</th><th>Status</th></tr></thead>
+                    <tbody>${dl.map(({ d, st: ds }) => `<tr class="fin-vrow" onclick="hvFinOpenDoc('${d.id}')">
+                        <td>${esc(docTag(d))}</td><td>${d.date ? esc(fmtDate(d.date)) : ''}</td><td style="font-size:0.7rem;">${esc(d.client || d.description || '')}</td>
+                        <td class="num">${d.taxable != null ? money(d.taxable) : ''}</td><td class="num">${d.gst ? money(d.gst) : ''}</td><td class="num">${money(d.total)}</td>
+                        <td class="num">${ds.tds ? money(ds.tds) : ''}</td><td class="num">${money(ds.paid)}${ds.pays.length > 1 ? `<span class="fin-vsub">${ds.pays.length} ${S.payWord}s</span>` : ''}</td>
+                        <td class="num">${ds.balance > 0.009 ? `<span class="fin-bal-due">${money(ds.balance)}</span>` : ds.balance < -0.009 ? money(ds.balance) : ''}</td>
+                        <td>${statusHtml(side, ds, d)}</td>
+                    </tr>`).join('')}</tbody></table></div>` : `<div class="fin-modal-sub">None yet. Click <strong>+ Invoice / PI</strong> to enter one.</div>`}
+                ${st.unlinked ? `<div class="fin-modal-sub" style="color:#b45309;">⚠ ${st.unlinked} ${S.payWord}${st.unlinked === 1 ? ' is' : 's are'} not linked to an invoice / PI yet. Open ${st.unlinked === 1 ? 'it' : 'them'} below to link.</div>` : ''}
 
-                <div class="fin-vsection">💸 Payments (click one to edit)</div>
-                ${pays.length ? `<div class="table-container" style="max-height: 34vh;"><table class="fin-vtable">
-                    <thead><tr><th>Date</th><th>Ref No</th><th>Type</th><th>Invoice No</th><th>Nature of Expense</th><th class="num">Paid</th><th class="num">TDS</th><th class="num">Advance adj.</th></tr></thead>
-                    <tbody>${pays.map(t => `<tr class="fin-vrow" onclick="hvFinOpenTxnModal('${t.id}')">
+                <div class="fin-vsection">💸 ${S.payWord === 'payment' ? 'Payments' : 'Receipts'} (click one to edit)</div>
+                ${pays.length ? `<div class="table-container" style="max-height: 30vh;"><table class="fin-vtable">
+                    <thead><tr><th>Date</th><th>Ref No</th><th>Against</th><th>Category</th><th class="num">Amount</th></tr></thead>
+                    <tbody>${pays.map(t => { const d = docById(t.docId); return `<tr class="fin-vrow" onclick="hvFinOpenTxnModal('${t.id}')">
                         <td>${esc(fmtDate(t.date))}</td>
                         <td class="fin-ref" title="${esc(t.refNo)}">${esc(t.refNo)}</td>
-                        <td>${t.payKind === 'advance' ? '<span class="fin-kind-badge adv" style="margin:0;">Advance</span>' : 'Invoice'}</td>
-                        <td>${esc(t.billNo)}</td>
+                        <td>${t.payKind === 'advance' ? '<span class="fin-kind-badge adv" style="margin:0;">Advance</span>' : d ? esc(docTag(d)) : '<span class="fin-warn-badge">⚠ not linked</span>'}</td>
                         <td style="font-size:0.7rem;">${esc(t.category)}</td>
                         <td class="num">${money(t.amount)}</td>
-                        <td class="num">${num(t.billTds) ? money(t.billTds) : ''}</td>
-                        <td class="num">${num(t.advAdjusted) ? money(t.advAdjusted) : ''}</td>
-                    </tr>`).join('')}</tbody></table></div>` : '<div class="fin-modal-sub">No payments linked to this vendor yet. Open a debit in the Finance list, pick a category like “Vendor / Contractor Payment”, then choose this vendor.</div>'}`;
+                    </tr>`; }).join('')}</tbody></table></div>` : `<div class="fin-modal-sub">No bank entries linked yet.</div>`}`;
         }
 
-        window.hvFinExportVendor = function (id) {
-            const v = vendorById(id);
+        const csvCell = x => { x = x === null || x === undefined ? '' : String(x); return /[",\n\r]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+        const csvAmt = n => n === null || n === undefined || n === '' ? '' : num(n).toFixed(2);
+        window.hvFinExportParty = function (side, id) {
+            const S = SIDES[side];
+            const v = partyById(side, id);
             if (!v) return;
-            const st = vendorStats(id);
-            const cell = x => { x = x === null || x === undefined ? '' : String(x); return /[",\n\r]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
-            const head = ['Payment Date', 'Ref No', 'Payment Type', 'Vendor Invoice No', 'Invoice Date', 'Invoice Amount', 'GST in Invoice', 'Paid from Bank', 'TDS Deducted', 'Advance Adjusted', 'Nature of Expense', 'Bank Account', 'Narration', 'Comments'];
+            const st = partyStats(side, id);
             const lines = [
-                cell('Vendor: ' + v.name) + (v.gstin ? ',' + cell('GSTIN ' + v.gstin) : '') + (v.pan ? ',' + cell('PAN ' + v.pan) : ''),
-                ['Paid ' + st.paid.toFixed(2), 'TDS ' + st.tds.toFixed(2), 'Advance open ' + st.advOpen.toFixed(2), 'Invoice balance due ' + st.due.toFixed(2)].map(cell).join(','),
-                '',
-                head.join(',')
-            ].concat(st.pays.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).map(t => [
-                t.date, t.refNo, t.payKind === 'advance' ? 'Advance' : 'Against invoice', t.billNo, t.billDate,
-                t.billAmount == null ? '' : t.billAmount, t.billGst == null ? '' : t.billGst, num(t.amount).toFixed(2),
-                t.billTds == null ? '' : t.billTds, t.advAdjusted == null ? '' : t.advAdjusted, t.category, t.account, t.narration, t.comments
-            ].map(cell).join(',')));
-            hvDownload(`HV_Vendor_${v.name.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+                [S.word + ': ' + v.name, v.gstin ? 'GSTIN ' + v.gstin : '', v.pan ? 'PAN ' + v.pan : ''].map(csvCell).join(','),
+                ['Invoiced ' + csvAmt(st.invoiced), 'TDS ' + csvAmt(st.tds), S.paidWord + ' ' + csvAmt(st.paid), 'Balance due ' + csvAmt(st.due), 'Advance not linked ' + csvAmt(st.advOpen)].map(csvCell).join(','),
+                ''
+            ].concat(docSheetLines(side, st.docs.map(x => x.d)));
+            const unl = st.pays.filter(t => !docById(t.docId));
+            if (unl.length) {
+                lines.push('', csvCell('Not linked to an invoice / PI (advances etc.)'), ['Date', 'Ref No', 'Type', 'Amount', 'Narration'].join(','));
+                unl.forEach(t => lines.push([t.date, t.refNo, t.payKind === 'advance' ? 'Advance' : 'Not linked', csvAmt(t.amount), t.narration].map(csvCell).join(',')));
+            }
+            hvDownload(`HV_${S.word}_${v.name.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+        };
+
+        /* Receivables / payables sheet: one line per invoice with its first payment, then one line per further payment (like the Excel registers) */
+        function docSheetLines(side, list) {
+            const S = SIDES[side];
+            const head = side === 'sales'
+                ? ['Inv No', 'Type', 'Company Name', 'GSTIN', 'Invoice Date', 'Amount', 'GST Amt', 'Grand Total', 'TDS Deduction', 'Amt Received', 'Balance Due', 'Received Date', 'Ref No', 'Client / Project', 'Via', 'Description', 'Converted from PI']
+                : ['Invoice Number', 'Type', 'Company Name', 'GSTIN', 'Invoice Date', 'Billed Amount', 'GST', 'Invoice Amount', 'TDS Deducted', 'Amount Due', 'Amount Paid', 'Balance', 'Paid Date', 'Ref No', 'Client / Project', 'Description', 'Converted from PI'];
+            const out = [head.map(csvCell).join(',')];
+            list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach(d => {
+                const p = partyById(side, d.partyId);
+                const st = docStats(d);
+                const pays = st.pays.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+                let bal = st.net;
+                const first = pays[0];
+                if (first) bal = round2(bal - num(first.amount) - num(first.tds) - num(first.advAdjusted));
+                const pi = d.piNo ? `${d.piNo}${d.piDate ? ' (' + d.piDate + ')' : ''}` : '';
+                out.push((side === 'sales'
+                    ? [d.no, d.kind, p ? p.name : '', p ? p.gstin : '', d.date, csvAmt(d.taxable), csvAmt(d.gst), csvAmt(d.total), csvAmt(d.tds), first ? csvAmt(first.amount) : '', csvAmt(bal), first ? first.date : '', first ? first.refNo : '', d.client, d.via, d.description, pi]
+                    : [d.no, d.kind, p ? p.name : '', p ? p.gstin : '', d.date, csvAmt(d.taxable), csvAmt(d.gst), csvAmt(d.total), csvAmt(d.tds), csvAmt(st.net), first ? csvAmt(first.amount) : '', csvAmt(bal), first ? first.date : '', first ? first.refNo : '', d.client, d.description, pi]
+                ).map(csvCell).join(','));
+                pays.slice(1).forEach(t => {
+                    bal = round2(bal - num(t.amount) - num(t.tds) - num(t.advAdjusted));
+                    const row = new Array(head.length).fill('');
+                    const iAmt = side === 'sales' ? 9 : 10;
+                    row[iAmt] = csvAmt(t.amount); row[iAmt + 1] = csvAmt(bal); row[iAmt + 2] = t.date; row[iAmt + 3] = t.refNo;
+                    out.push(row.map(csvCell).join(','));
+                });
+            });
+            return out;
+        }
+
+        /* ---------- 📊 Invoices & Reports window ---------- */
+        const dv = { tab: 'purchase', fy: '', status: 'all', q: '' };
+        window.hvFinOpenDocs = function (tab) {
+            if (tab) dv.tab = tab;
+            $('finDocsModal').style.display = 'block';
+            renderDocs();
+        };
+        window.hvFinCloseDocs = function () { $('finDocsModal').style.display = 'none'; };
+        window.hvFinDocsSet = function (k, v, keepFocus) { dv[k] = v; renderDocs(keepFocus); };
+        const fyList = () => [...new Set(docs.map(d => d.date && fyOf(d.date)).filter(Boolean))].sort().reverse();
+
+        function renderDocs(keepFocus) {
+            const box = $('finDocsBody');
+            const tabBtn = (k, label) => `<button type="button" class="fin-doc-tab${dv.tab === k ? ' active' : ''}" onclick="hvFinDocsSet('tab', '${k}')">${label}</button>`;
+            const fys = fyList();
+            if (dv.fy && !fys.includes(dv.fy)) dv.fy = '';
+            const isTds = dv.tab === 'tdsV' || dv.tab === 'tdsC';
+            const side = dv.tab === 'sales' || dv.tab === 'tdsC' ? 'sales' : 'purchase';
+            const S = SIDES[side];
+            const statusSel = isTds
+                ? `<select onchange="hvFinDocsSet('status', this.value)">
+                        <option value="all"${dv.status === 'all' ? ' selected' : ''}>All</option>
+                        <option value="pending"${dv.status === 'pending' ? ' selected' : ''}>${side === 'sales' ? 'To check in 26AS' : 'Not deposited yet'}</option>
+                        <option value="done"${dv.status === 'done' ? ' selected' : ''}>${side === 'sales' ? 'Checked' : 'Deposited'}</option></select>`
+                : `<select onchange="hvFinDocsSet('status', this.value)">
+                        <option value="all"${dv.status === 'all' ? ' selected' : ''}>All</option>
+                        <option value="open"${dv.status === 'open' ? ' selected' : ''}>Balance due</option>
+                        <option value="paid"${dv.status === 'paid' ? ' selected' : ''}>Settled</option>
+                        <option value="PI"${dv.status === 'PI' ? ' selected' : ''}>PIs only</option>
+                        <option value="Invoice"${dv.status === 'Invoice' ? ' selected' : ''}>Tax invoices only</option></select>`;
+            if (isTds && !['all', 'pending', 'done'].includes(dv.status)) dv.status = 'all';
+            if (!isTds && !['all', 'open', 'paid', 'PI', 'Invoice'].includes(dv.status)) dv.status = 'all';
+            const q = dv.q.trim().toLowerCase();
+            let list = docs.filter(d => d.side === side && (!dv.fy || (d.date && fyOf(d.date) === dv.fy))).map(d => ({ d, st: docStats(d), p: partyById(side, d.partyId) }))
+                .filter(({ d, p }) => !q || [d.no, d.piNo, p && p.name, p && p.gstin, d.client, d.via, d.description, d.notes].join(' ').toLowerCase().includes(q));
+            let html = `
+                <div class="fin-vhead"><h2>📊 Invoices &amp; Reports</h2>
+                    <button type="button" class="btn-add-lead" onclick="hvFinOpenDoc(null, { side: '${side}' })">+ New ${side === 'sales' ? 'Sales' : 'Purchase'} Invoice / PI</button></div>
+                <div class="fin-doc-tabs">${tabBtn('purchase', '🏢 Payables')}${tabBtn('sales', '🤝 Receivables')}${tabBtn('tdsV', '🧮 TDS – Vendors')}${tabBtn('tdsC', '🧾 TDS – by Customers')}</div>
+                <div class="fin-doc-filters">
+                    <select onchange="hvFinDocsSet('fy', this.value)"><option value="">All years</option>${fys.map(f => `<option value="${esc(f)}"${f === dv.fy ? ' selected' : ''}>${esc(f)}</option>`).join('')}</select>
+                    ${statusSel}
+                    <input type="text" id="finDocSearch" placeholder="🔍 No, ${S.word.toLowerCase()}, client, description…" value="${esc(dv.q)}" oninput="hvFinDocsSet('q', this.value, true)">
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinExportDocs()">⬇️ Export</button>
+                </div>`;
+            if (!isTds) {
+                if (dv.status === 'open') list = list.filter(x => x.st.balance > 0.009);
+                else if (dv.status === 'paid') list = list.filter(x => x.st.balance <= 0.009);
+                else if (dv.status === 'PI' || dv.status === 'Invoice') list = list.filter(x => (x.d.kind === 'PI') === (dv.status === 'PI'));
+                list.sort((a, b) => (b.d.date || '').localeCompare(a.d.date || ''));
+                const inv = list.filter(x => x.d.kind !== 'PI');
+                const sum = (a, f) => round2(a.reduce((s, x) => s + f(x), 0));
+                const T = { tax: sum(inv, x => num(x.d.taxable)), gst: sum(inv, x => num(x.d.gst)), total: sum(inv, x => num(x.d.total)), tds: sum(inv, x => num(x.d.tds)), paid: sum(list, x => x.st.paid), bal: sum(inv, x => x.st.balance > 0 ? x.st.balance : 0) };
+                html += `<div class="fin-summary">
+                    <span class="fin-chip">${list.length} document${list.length === 1 ? '' : 's'}</span>
+                    <span class="fin-chip">Invoiced <strong>${money(T.total)}</strong> (GST ${money(T.gst)})</span>
+                    <span class="fin-chip">TDS <strong>${money(T.tds)}</strong></span>
+                    <span class="fin-chip ${side === 'sales' ? 'credit' : 'debit'}">${S.paidWord} <strong>${money(T.paid)}</strong></span>
+                    <span class="fin-chip${T.bal > 0.009 ? ' debit' : ' credit'}">${side === 'sales' ? 'Receivable' : 'Payable'} <strong>${money(T.bal)}</strong></span></div>`;
+                html += list.length ? `<div class="table-container" style="max-height: 56vh;"><table class="fin-vtable">
+                    <thead><tr><th>No</th><th>${S.word}</th><th>Date</th><th>Status</th><th class="num">Amount</th><th class="num">GST</th><th class="num">Grand Total</th><th class="num">TDS</th><th class="num">${S.paidWord}</th><th class="num">Balance</th><th>Last ${S.payWord}</th><th>Client / Project</th></tr></thead>
+                    <tbody>${list.map(({ d, st, p }) => `<tr class="fin-vrow" onclick="hvFinOpenDoc('${d.id}')">
+                        <td><span class="fin-vname">${esc(d.no)}</span>${d.kind === 'PI' ? '<span class="fin-vsub">Proforma</span>' : d.piNo ? `<span class="fin-vsub">from PI ${esc(d.piNo)}</span>` : ''}</td>
+                        <td>${p ? esc(p.name) : '<span class="fin-warn-badge">⚠ not set</span>'}</td>
+                        <td>${d.date ? esc(fmtDate(d.date)) : ''}</td>
+                        <td>${statusHtml(side, st, d)}</td>
+                        <td class="num">${d.taxable != null ? money(d.taxable) : ''}</td><td class="num">${d.gst ? money(d.gst) : ''}</td><td class="num">${money(d.total)}</td>
+                        <td class="num">${st.tds ? money(st.tds) : ''}</td>
+                        <td class="num">${st.paid ? money(st.paid) : ''}${st.pays.length > 1 ? `<span class="fin-vsub">${st.pays.length} ${S.payWord}s</span>` : ''}</td>
+                        <td class="num">${st.balance > 0.009 ? `<span class="fin-bal-due">${money(st.balance)}</span>` : st.balance < -0.009 ? money(st.balance) : '–'}</td>
+                        <td>${st.last ? esc(fmtDate(st.last)) : ''}</td>
+                        <td class="fin-cp" title="${esc([d.client, side === 'sales' && d.via ? 'via ' + d.via : '', d.description].filter(Boolean).join(' · '))}">${esc([d.client, side === 'sales' && d.via ? 'via ' + d.via : '', d.description].filter(Boolean).join(' · '))}</td></tr>`).join('')}
+                        ${list.length > 1 ? `<tr class="fin-vtotal"><td colspan="4">Total (tax invoices)</td><td class="num">${money(T.tax)}</td><td class="num">${money(T.gst)}</td><td class="num">${money(T.total)}</td><td class="num">${money(T.tds)}</td><td class="num">${money(T.paid)}</td><td class="num">${money(T.bal)}</td><td colspan="2"></td></tr>` : ''}
+                    </tbody></table></div>` : `<div class="fin-empty" style="padding:24px;">${docs.some(d => d.side === side) ? 'Nothing matches these filters.' : `No ${side === 'sales' ? 'sales invoices / PIs' : 'purchase bills / PIs'} yet. Click <strong>+ New</strong> to enter one before (or after) the bank entry.`}</div>`;
+            } else {
+                list = list.filter(x => num(x.d.tds) > 0);
+                const done = x => !!x.d.tdsDeposit;
+                if (dv.status === 'pending') list = list.filter(x => !done(x));
+                else if (dv.status === 'done') list = list.filter(done);
+                list.sort((a, b) => (b.d.date || '').localeCompare(a.d.date || ''));
+                const today = todayIso();
+                const sum = (a, f) => round2(a.reduce((s, x) => s + f(x), 0));
+                const pend = list.filter(x => !done(x));
+                const over = side === 'purchase' ? pend.filter(x => tdsDueDate(x.d.date) && tdsDueDate(x.d.date) < today) : [];
+                html += `<div class="fin-summary">
+                    <span class="fin-chip">TDS <strong>${money(sum(list, x => num(x.d.tds)))}</strong> (${list.length})</span>
+                    <span class="fin-chip${pend.length ? ' warn' : ' credit'}">${side === 'sales' ? 'To check in 26AS' : 'Not deposited'} <strong>${money(sum(pend, x => num(x.d.tds)))}</strong> (${pend.length})</span>
+                    ${over.length ? `<span class="fin-chip debit">Past due date <strong>${money(sum(over, x => num(x.d.tds)))}</strong> (${over.length})</span>` : ''}
+                    ${side === 'purchase' ? `<span class="fin-chip">Penalty / interest <strong>${money(sum(list, x => num(x.d.tdsPenalty)))}</strong></span>` : ''}</div>
+                    <div class="fin-modal-sub">${side === 'purchase'
+                        ? 'TDS you deducted from vendor bills. Due date is the 7th of the next month (30 April for March), worked out from the invoice date. Open a bill to enter the deposit date and any penalty.'
+                        : 'TDS your customers deducted from your invoices. You cannot see their deposit, so open the invoice and enter the date you checked the credit in Form 26AS / AIS.'}</div>`;
+                html += list.length ? `<div class="table-container" style="max-height: 52vh;"><table class="fin-vtable">
+                    <thead><tr><th>${S.word} Name</th><th>Invoice Number</th><th>Invoice Date</th><th class="num">Invoice Net Amount</th><th class="num">TDS</th><th class="num">%</th>${side === 'purchase' ? '<th>Due by</th><th>Deposit Date</th><th class="num">Penalty</th>' : '<th>Checked in 26AS</th>'}<th>Notes</th></tr></thead>
+                    <tbody>${list.map(({ d, p }) => {
+                        const rate = d.tdsRate != null && d.tdsRate !== '' ? d.tdsRate : (num(d.taxable) ? round2(num(d.tds) / num(d.taxable) * 100) : '');
+                        const due = tdsDueDate(d.date);
+                        const late = side === 'purchase' && !d.tdsDeposit && due && due < today;
+                        return `<tr class="fin-vrow" onclick="hvFinOpenDoc('${d.id}')">
+                        <td>${p ? esc(p.name) : ''}</td><td>${esc(d.no)}</td><td>${d.date ? esc(fmtDate(d.date)) : ''}</td>
+                        <td class="num">${d.taxable != null ? money(d.taxable) : ''}</td><td class="num">${money(d.tds)}</td><td class="num">${rate !== '' ? esc(rate) + '%' : ''}</td>
+                        ${side === 'purchase' ? `<td>${due ? `<span${late ? ' class="fin-bal-due"' : ''}>${esc(fmtDate(due))}</span>` : ''}</td>
+                        <td>${d.tdsDeposit ? esc(fmtDate(d.tdsDeposit)) + (d.tdsDeposit > due ? ' <span class="fin-st part">late</span>' : '') : `<span class="fin-st ${late ? 'open' : 'part'}">${late ? 'Overdue' : 'Pending'}</span>`}</td>
+                        <td class="num">${num(d.tdsPenalty) ? money(d.tdsPenalty) : ''}</td>`
+                        : `<td>${d.tdsDeposit ? '✓ ' + esc(fmtDate(d.tdsDeposit)) : '<span class="fin-st part">To check</span>'}</td>`}
+                        <td style="font-size:0.7rem;">${esc(d.notes || '')}</td></tr>`; }).join('')}</tbody></table></div>`
+                    : `<div class="fin-empty" style="padding:24px;">No TDS entered on ${side === 'sales' ? 'sales invoices' : 'purchase bills'}${dv.fy ? ' for ' + esc(dv.fy) : ''} yet.</div>`;
+            }
+            box.innerHTML = html;
+            if (keepFocus) { const s = $('finDocSearch'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
+        }
+
+        window.hvFinExportDocs = function () {
+            const isTds = dv.tab === 'tdsV' || dv.tab === 'tdsC';
+            const side = dv.tab === 'sales' || dv.tab === 'tdsC' ? 'sales' : 'purchase';
+            let list = docs.filter(d => d.side === side && (!dv.fy || (d.date && fyOf(d.date) === dv.fy)));
+            const q = dv.q.trim().toLowerCase();
+            if (q) list = list.filter(d => { const p = partyById(side, d.partyId); return [d.no, d.piNo, p && p.name, p && p.gstin, d.client, d.via, d.description, d.notes].join(' ').toLowerCase().includes(q); });
+            let lines, name;
+            if (!isTds) {
+                if (dv.status === 'open') list = list.filter(d => docStats(d).balance > 0.009);
+                else if (dv.status === 'paid') list = list.filter(d => docStats(d).balance <= 0.009);
+                else if (dv.status === 'PI' || dv.status === 'Invoice') list = list.filter(d => (d.kind === 'PI') === (dv.status === 'PI'));
+                lines = docSheetLines(side, list);
+                name = side === 'sales' ? 'Receivables' : 'Payables';
+            } else {
+                list = list.filter(d => num(d.tds) > 0);
+                if (dv.status === 'pending') list = list.filter(d => !d.tdsDeposit);
+                else if (dv.status === 'done') list = list.filter(d => d.tdsDeposit);
+                const head = side === 'purchase'
+                    ? ['Vendor Name', 'Invoice Number', 'Invoice Date', 'Invoice Net Amount', 'TDS Deducted', '%', 'Due By', 'Deposit Date', 'Penalty', 'Notes']
+                    : ['Customer Name', 'Invoice Number', 'Invoice Date', 'Invoice Net Amount', 'TDS Deducted', '%', 'Checked in 26AS', 'Notes'];
+                lines = [head.join(',')].concat(list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(d => {
+                    const p = partyById(side, d.partyId);
+                    const rate = d.tdsRate != null && d.tdsRate !== '' ? d.tdsRate : (num(d.taxable) ? round2(num(d.tds) / num(d.taxable) * 100) : '');
+                    return (side === 'purchase'
+                        ? [p ? p.name : '', d.no, d.date, csvAmt(d.taxable), csvAmt(d.tds), rate === '' ? '' : rate + '%', tdsDueDate(d.date), d.tdsDeposit || 'Not deposited', csvAmt(d.tdsPenalty), d.notes]
+                        : [p ? p.name : '', d.no, d.date, csvAmt(d.taxable), csvAmt(d.tds), rate === '' ? '' : rate + '%', d.tdsDeposit || 'To check', d.notes]).map(csvCell).join(',');
+                }));
+                name = side === 'sales' ? 'TDS_by_Customers' : 'TDS_Vendors';
+            }
+            if (lines.length < 2) { alert('Nothing to export for these filters.'); return; }
+            hvDownload(`HV_${name}${dv.fy ? '_' + dv.fy.replace(/\s+/g, '') : ''}_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+        };
+
+        /* ---------- one invoice / PI ---------- */
+        let dm = { id: null, side: 'purchase', from: '', convertFrom: null, totalTouched: false, tdsTouched: false, gstTouched: false };
+        const docKind = () => { const r = document.querySelector('input[name="fd-kind"]:checked'); return r ? r.value : 'Invoice'; };
+        function setDocKind(k) { document.querySelectorAll('input[name="fd-kind"]').forEach(r => { r.checked = r.value === (k === 'PI' ? 'PI' : 'Invoice'); }); }
+
+        /* pre: { side, partyId, from } for a new one */
+        window.hvFinOpenDoc = function (id, pre) {
+            const d = docById(id);
+            pre = pre || {};
+            if (!d && !pre.side) return;
+            const side = d ? d.side : pre.side;
+            const S = SIDES[side];
+            dm = { id: d ? d.id : null, side, from: pre.from || '', convertFrom: null, totalTouched: !!d, tdsTouched: !!(d && d.tds != null && d.tds !== ''), gstTouched: !!(d && d.gst != null && d.gst !== '') };
+            $('finDocForm').reset();
+            $('fdTitle').textContent = d ? `${d.kind === 'PI' ? 'Proforma Invoice' : 'Invoice'} ${d.no}` : `New ${side === 'sales' ? 'Sales' : 'Purchase'} Invoice / PI`;
+            $('fdSub').innerHTML = side === 'sales' ? 'Sales: you raised this on a customer.' : 'Purchase: a vendor raised this on you.';
+            $('fdPartyLabel').textContent = S.word + ' *';
+            $('fd-party').innerHTML = partyOptions(side, d ? d.partyId : (pre.partyId || ''));
+            setDocKind(d ? d.kind : 'Invoice');
+            $('fd-no').value = d ? d.no : '';
+            $('fd-date').value = d ? (d.date || '') : todayIso();
+            $('fd-due').value = d ? (d.dueDate || '') : '';
+            $('fd-taxable').value = d ? amtStr(d.taxable) : '';
+            $('fd-gst').value = d ? amtStr(d.gst) : '';
+            $('fd-total').value = d ? amtStr(d.total) : '';
+            const p0 = partyById(side, d ? d.partyId : pre.partyId);
+            $('fd-tds-rate').value = d ? (d.tdsRate != null ? d.tdsRate : '') : (p0 && p0.tdsRate != null ? p0.tdsRate : '');
+            $('fd-tds').value = d ? amtStr(d.tds) : '';
+            $('fd-tds-dep').value = d ? (d.tdsDeposit || '') : '';
+            $('fd-tds-pen').value = d ? amtStr(d.tdsPenalty) : '';
+            $('fd-client').value = d ? (d.client || '') : '';
+            $('fd-via').value = d ? (d.via || '') : '';
+            $('fd-desc').value = d ? (d.description || '') : '';
+            $('fd-notes').value = d ? (d.notes || '') : '';
+            $('fdViaWrap').style.display = side === 'sales' ? '' : 'none';
+            $('fdTdsHeading').textContent = side === 'sales' ? '🧮 TDS deducted by the customer' : '🧮 TDS you deduct';
+            document.querySelectorAll('#finDocForm .fin-tds-dep')[1].style.display = side === 'sales' ? 'none' : '';
+            $('fd-tds-dep').previousElementSibling.textContent = side === 'sales' ? 'Checked in 26AS on' : 'Deposit Date';
+            $('fdDeleteBtn').style.display = d ? '' : 'none';
+            const clients = new Set(), vias = new Set();
+            docs.forEach(x => { if (x.client) clients.add(x.client); if (x.via) vias.add(x.via); });
+            try { (typeof leads !== 'undefined' ? leads : []).forEach(l => { if (l && l.company) clients.add(String(l.company).trim()); }); } catch (e) {}
+            ['M911', 'OpEzee'].forEach(x => vias.add(x));
+            $('fdClientList').innerHTML = [...clients].sort().map(c => `<option value="${esc(c)}">`).join('');
+            $('fdViaList').innerHTML = [...vias].sort().map(c => `<option value="${esc(c)}">`).join('');
+            hvFinDocKindChanged();
+            hvFinDocCalc();
+            renderDocHistory();
+            $('finDocModal').style.display = 'block';
+            $('finDocModal').scrollTop = 0;
+            softFocus('finDocModal', $(d ? 'fd-no' : (pre.partyId ? 'fd-no' : 'fd-party')));
+        };
+        window.hvFinCloseDoc = function () { $('finDocModal').style.display = 'none'; dm.id = null; };
+        window.hvFinDocKindChanged = function () {
+            const pi = docKind() === 'PI';
+            $('fdNoLabel').textContent = pi ? 'PI No *' : 'Invoice No *';
+            $('fdDateLabel').textContent = pi ? 'PI Date *' : 'Invoice Date *';
+            const d = docById(dm.id);
+            $('fdConvertBtn').style.display = d && d.kind === 'PI' && !dm.convertFrom ? '' : 'none';
+            const note = $('fdPiNote');
+            if (dm.convertFrom) { note.className = 'fin-recon gap'; note.innerHTML = `Converting PI <strong>${esc(dm.convertFrom.no)}</strong> to a tax invoice: enter the invoice no and date (and amounts if they changed), then Save. Payments made against the PI stay linked.`; }
+            else if (d && d.piNo) { note.className = 'fin-recon'; note.innerHTML = `Converted from PI <strong>${esc(d.piNo)}</strong>${d.piDate ? ' dated ' + esc(fmtDate(d.piDate)) : ''}.`; }
+            else { note.className = 'fin-recon'; note.textContent = pi ? 'A PI is a request for payment; advances paid against it stay linked when it becomes a tax invoice.' : ''; }
+        };
+        window.hvFinConvertPI = function () {
+            const d = docById(dm.id);
+            if (!d || d.kind !== 'PI') return;
+            dm.convertFrom = { no: d.no, date: d.date };
+            setDocKind('Invoice');
+            $('fd-no').value = ''; $('fd-date').value = todayIso();
+            hvFinDocKindChanged();
+            $('fd-no').focus();
+        };
+        window.hvFinDocPartyPicked = function () {
+            const sel = $('fd-party');
+            if (sel.value === '__new') { sel.value = ''; hvFinNewPartyFromDoc(); return; }
+            const p = partyById(dm.side, sel.value);
+            if (p && p.tdsRate != null && !$('fd-tds-rate').value && !dm.id) { $('fd-tds-rate').value = p.tdsRate; hvFinDocCalc('rate'); }
+        };
+        window.hvFinNewPartyFromDoc = function () { hvFinOpenPartyModal(dm.side, null, 'doc', ''); };
+        /* keep Amount + GST = Grand Total, and TDS = Amount × % (until the user types a figure in themselves) */
+        window.hvFinDocCalc = function (src) {
+            const tax = amtVal('fd-taxable'), gstV = amtVal('fd-gst'), tot = amtVal('fd-total');
+            if (src === 'total') dm.totalTouched = $('fd-total').value !== '';
+            if (src === 'gst') dm.gstTouched = $('fd-gst').value !== '';
+            if (src === 'tds') dm.tdsTouched = $('fd-tds').value !== '';
+            if (src === 'taxable' && !dm.gstTouched && tax != null) $('fd-gst').value = amtStr(round2(tax * 0.18));
+            if ((src === 'taxable' || src === 'gst') && !dm.totalTouched) {
+                const t2 = amtVal('fd-taxable'), g2 = amtVal('fd-gst');
+                $('fd-total').value = t2 != null ? amtStr(round2(t2 + (g2 || 0))) : '';
+            }
+            if (src === 'total' && tax == null && gstV != null && tot != null) $('fd-taxable').value = amtStr(round2(tot - gstV));
+            const rate = parseFloat($('fd-tds-rate').value);
+            const t3 = amtVal('fd-taxable');
+            if ((src === 'rate' || src === 'taxable' || src === 'total') && !dm.tdsTouched && isFinite(rate) && t3 != null) $('fd-tds').value = amtStr(round2(t3 * rate / 100));
+            const note = $('fdTdsNote');
+            const tds = amtVal('fd-tds');
+            if (!tds) { note.textContent = dm.side === 'purchase' ? 'Enter the TDS % (e.g. 2) and the amount fills in from the Amount before GST.' : ''; note.className = 'full-width fin-recon'; return; }
+            const total = amtVal('fd-total') || 0;
+            let msg = `${dm.side === 'sales' ? 'Expected to receive' : 'Amount due to the vendor'}: ${money(round2(total - tds))} (grand total less TDS).`;
+            if (dm.side === 'purchase') {
+                const due = tdsDueDate($('fd-date').value);
+                const dep = $('fd-tds-dep').value;
+                if (due) msg += dep ? (dep > due ? ` ⚠ Deposited after the due date (${fmtDate(due)}).` : ` ✓ Deposited on time (due ${fmtDate(due)}).`) : ` TDS deposit due by ${fmtDate(due)}.`;
+            }
+            note.textContent = msg;
+            note.className = 'full-width fin-recon' + (dm.side === 'purchase' && !$('fd-tds-dep').value && tdsDueDate($('fd-date').value) < todayIso() ? ' gap' : '');
+        };
+
+        window.hvFinSaveDoc = function () {
+            const side = dm.side, S = SIDES[side];
+            const p = partyById(side, $('fd-party').value);
+            const kind = docKind();
+            const no = $('fd-no').value.trim();
+            const date = $('fd-date').value;
+            const total = amtVal('fd-total');
+            if (!p) { alert(`Please pick the ${S.word.toLowerCase()}.`); $('fd-party').focus(); return; }
+            if (!no) { alert(`Please enter the ${kind === 'PI' ? 'PI' : 'invoice'} number.`); $('fd-no').focus(); return; }
+            if (!date) { alert('Please enter the date.'); $('fd-date').focus(); return; }
+            if (!total) { alert('Please enter the grand total.'); $('fd-total').focus(); return; }
+            const dup = docs.find(x => x.id !== dm.id && x.side === side && x.partyId === p.id && x.kind === kind && norm(x.no) === norm(no));
+            if (dup) { alert(`${p.name} already has ${kind === 'PI' ? 'a PI' : 'an invoice'} numbered "${dup.no}". Open that one instead.`); return; }
+            const rate = parseFloat($('fd-tds-rate').value);
+            const now = new Date().toISOString();
+            const fields = {
+                side, kind, partyId: p.id, no, date, dueDate: $('fd-due').value,
+                taxable: amtVal('fd-taxable'), gst: amtVal('fd-gst'), total,
+                tdsRate: isFinite(rate) ? rate : null, tds: amtVal('fd-tds'), tdsDeposit: $('fd-tds-dep').value, tdsPenalty: side === 'purchase' ? amtVal('fd-tds-pen') : null,
+                client: $('fd-client').value.trim(), via: side === 'sales' ? $('fd-via').value.trim() : '',
+                description: $('fd-desc').value.trim(), notes: $('fd-notes').value.trim(), updatedAt: now
+            };
+            let d = docById(dm.id);
+            if (d) {
+                if (d.partyId !== p.id) {
+                    const linked = txns.filter(t => t.docId === d.id);
+                    if (linked.length && !confirm(`${linked.length} bank entr${linked.length === 1 ? 'y is' : 'ies are'} linked to this document. Move ${linked.length === 1 ? 'it' : 'them'} to ${p.name} too?`)) return;
+                    linked.forEach(t => { t[S.idField] = p.id; t.party = p.name; });
+                    if (linked.length) save();
+                }
+                if (dm.convertFrom) { fields.piNo = dm.convertFrom.no; fields.piDate = dm.convertFrom.date; }
+                Object.assign(d, fields);
+            } else {
+                d = Object.assign({ id: newId('doc_'), piNo: '', piDate: '', createdAt: now }, fields);
+                docs.push(d);
+            }
+            saveDocs();
+            const from = dm.from;
+            dm.id = d.id; dm.convertFrom = null; dm.from = '';
+            if (from === 'txn' && $('finTxnModal').style.display === 'block') {
+                hvFinCloseDoc();
+                lastDocPick = d.id;
+                setPayKind('invoice');
+                hvFinPartyPicked();
+            } else {
+                $('fdTitle').textContent = `${d.kind === 'PI' ? 'Proforma Invoice' : 'Invoice'} ${d.no}`;
+                $('fdDeleteBtn').style.display = '';
+                dm.totalTouched = true;
+                hvFinDocKindChanged();
+                renderDocHistory();
+                flashSaved();
+            }
+            hvRenderFinance();
+            if ($('finPartiesModal').style.display === 'block') renderParties();
+            if ($('finDocsModal').style.display === 'block') renderDocs();
+        };
+        function flashSaved() {
+            const b = document.querySelector('#finDocForm button[type=submit]');
+            const t = b.textContent; b.textContent = '✓ Saved'; setTimeout(() => { b.textContent = t; }, 1200);
+        }
+        window.hvFinDeleteDoc = function () {
+            const d = docById(dm.id);
+            if (!d) return;
+            const linked = txns.filter(t => t.docId === d.id).length;
+            if (linked) { alert(`${linked} bank entr${linked === 1 ? 'y is' : 'ies are'} linked to this document, so it cannot be deleted.\n\nOpen ${linked === 1 ? 'it' : 'them'} and link to another invoice / PI (or mark as advance) first.`); return; }
+            if (!confirm(`Delete ${docTag(d)}?`)) return;
+            docs = docs.filter(x => x.id !== d.id);
+            saveDocs();
+            hvFinCloseDoc();
+            hvRenderFinance();
+            refreshFinWindows();
+        };
+
+        /* payment history + linking under the invoice / PI form */
+        let linkOpen = false;
+        function renderDocHistory() {
+            const box = $('fdHistory');
+            const d = docById(dm.id);
+            if (!d) { box.innerHTML = '<div class="fin-modal-sub" style="margin-top:10px;">After saving, you can link bank entries to it here.</div>'; linkOpen = false; return; }
+            const S = SIDES[d.side];
+            const st = docStats(d);
+            const rows = st.pays.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+            let bal = st.net;
+            box.innerHTML = `
+                <div class="fin-vsection">💸 ${S.payWord === 'payment' ? 'Payments' : 'Receipts'} against this ${d.kind === 'PI' ? 'PI' : 'invoice'}</div>
+                <div class="fin-summary">
+                    <span class="fin-chip">Total <strong>${money(st.total)}</strong></span>
+                    ${st.tds ? `<span class="fin-chip">TDS <strong>${money(st.tds)}</strong></span>` : ''}
+                    <span class="fin-chip ${d.side === 'sales' ? 'credit' : 'debit'}">${S.paidWord} <strong>${money(st.paid)}</strong></span>
+                    <span class="fin-chip${st.balance > 0.009 ? ' debit' : ' credit'}">Balance <strong>${money(st.balance)}</strong></span>
+                    ${statusHtml(d.side, st, d)}
+                </div>
+                ${rows.length ? `<div class="table-container"><table class="fin-vtable"><thead><tr><th>Date</th><th>Ref No</th><th>Narration</th><th class="num">Amount</th><th class="num">Balance after</th><th></th></tr></thead><tbody>
+                    ${rows.map(t => { bal = round2(bal - num(t.amount) - num(t.tds) - num(t.advAdjusted)); return `<tr>
+                        <td>${esc(fmtDate(t.date))}</td><td class="fin-ref">${esc(t.refNo)}</td><td class="fin-narr" title="${esc(t.narration)}">${esc(t.narration)}</td>
+                        <td class="num">${money(t.amount)}</td><td class="num">${money(bal)}</td>
+                        <td><button type="button" class="btn-action btn-edit" onclick="hvFinOpenTxnFromDoc('${t.id}')">Open</button> <button type="button" class="btn-action btn-delete" onclick="hvFinUnlinkTxn('${t.id}')" title="Take this bank entry off this invoice / PI (the entry itself stays)">Unlink</button></td></tr>`; }).join('')}
+                    </tbody></table></div>` : `<div class="fin-modal-sub">No ${S.payWord}s linked yet.</div>`}
+                <div class="fin-hist-actions">
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinToggleLink()">🔗 Link a bank entry</button>
+                    <button type="button" class="theme-toggle-btn" onclick="hvFinNewTxnForDoc()" title="For cash, or a ${S.payWord} not in an imported bank statement">+ Record ${S.payWord} by hand</button>
+                </div>
+                <div id="fdLinkBox"></div>`;
+            if (linkOpen) renderLinkBox();
+        }
+        window.hvFinToggleLink = function () { linkOpen = !linkOpen; renderLinkBox(); };
+        window.hvFinLinkSearch = function (el) { renderLinkBox(el.value, true); };
+        function renderLinkBox(q, keepFocus) {
+            const box = $('fdLinkBox');
+            if (!box) return;
+            if (!linkOpen) { box.innerHTML = ''; return; }
+            const d = docById(dm.id);
+            if (!d) return;
+            const S = SIDES[d.side];
+            const st = docStats(d);
+            q = (q || '').trim().toLowerCase();
+            const cands = txns.filter(t => t.type === S.txnType && !t.docId && (!t.category || sideOfTxn(t) === d.side) && (!t[S.idField] || t[S.idField] === d.partyId))
+                .filter(t => !q || [t.refNo, t.narration, t.party, String(t.amount), t.date].join(' ').toLowerCase().includes(q))
+                .map(t => ({ t, score: (t[S.idField] === d.partyId ? 0 : 1e12) + Math.abs(num(t.amount) - Math.max(st.balance, 0)) }))
+                .sort((a, b) => a.score - b.score || (a.t.date < b.t.date ? 1 : -1)).slice(0, 30);
+            box.innerHTML = `<div class="fin-modal-sub" style="margin-top:8px;">${S.txnType === 'Debit' ? 'Debits' : 'Credits'} not yet linked to any invoice / PI${partyById(d.side, d.partyId) ? ', this ' + S.word.toLowerCase() + '\'s first, then closest to the balance' : ''}. Click one to open it, check and Save.</div>
+                <input type="text" placeholder="🔍 Search ref, narration, amount…" value="${esc(q)}" oninput="hvFinLinkSearch(this)" id="fdLinkSearch" style="height:32px;font-size:0.75rem;">
+                <div class="fin-link-list">${cands.map(({ t }) => `<div class="fin-link-row" onclick="hvFinLinkTxn('${t.id}')">
+                    <span>${esc(fmtDate(t.date))}</span><span class="fin-ref">${esc(t.refNo)}</span><span class="grow" title="${esc(t.narration)}">${esc(t.party ? t.party + ' · ' : '')}${esc(t.narration)}</span>
+                    <strong class="fin-amt ${t.type === 'Credit' ? 'credit' : 'debit'}">${money(t.amount)}</strong></div>`).join('') || '<div class="fin-empty" style="padding:14px;">No unlinked bank entries found.</div>'}</div>`;
+            if (keepFocus) { const s = $('fdLinkSearch'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+        }
+        window.hvFinLinkTxn = function (tid) {
+            const d = docById(dm.id), t = txns.find(x => x.id === tid);
+            if (!d || !t) return;
+            const S = SIDES[d.side];
+            const cat = t.category && sideOfTxn(t) === d.side ? t.category : S.defaultCat;
+            linkOpen = false;
+            hvFinCloseDoc();
+            hvFinOpenTxnModal(t.id, null, { category: cat, partyId: d.partyId, docId: d.id, payKind: 'invoice', returnDoc: d.id });
+        };
+        window.hvFinOpenTxnFromDoc = function (tid) {
+            const d = docById(dm.id);
+            hvFinCloseDoc();
+            hvFinOpenTxnModal(tid, null, { returnDoc: d ? d.id : null });
+        };
+        window.hvFinNewTxnForDoc = function () {
+            const d = docById(dm.id);
+            if (!d) return;
+            const S = SIDES[d.side];
+            const st = docStats(d);
+            hvFinCloseDoc();
+            hvFinOpenTxnModal(null, null, { type: S.txnType, category: S.defaultCat, partyId: d.partyId, docId: d.id, payKind: 'invoice', amount: st.balance > 0 ? st.balance : null, returnDoc: d.id });
+        };
+        window.hvFinUnlinkTxn = function (tid) {
+            const t = txns.find(x => x.id === tid);
+            if (!t) return;
+            if (!confirm(`Take this ${money(t.amount)} entry of ${fmtDate(t.date)} off this invoice / PI?\n\nThe bank entry stays; it will show as not linked.`)) return;
+            t.docId = ''; t.updatedAt = new Date().toISOString();
+            save();
+            renderDocHistory();
+            hvRenderFinance();
+            if ($('finPartiesModal').style.display === 'block') renderParties();
+            if ($('finDocsModal').style.display === 'block') renderDocs();
         };
 
         /* ---------- import ---------- */
@@ -6819,10 +7470,10 @@
 
         window.hvFinClearAll = function () {
             if (!txns.length && !imports.length) { alert('There is no finance data to delete.'); return; }
-            if (!confirm(`Delete ALL finance data?\n\nThis removes ${txns.length} transaction${txns.length === 1 ? '' : 's'}, ${imports.length} import record${imports.length === 1 ? '' : 's'} and ${vendors.length} vendor${vendors.length === 1 ? '' : 's'}.\nLeads, tasks and notes are NOT affected.\n\nA safety backup of everything downloads first.`)) return;
+            if (!confirm(`Delete ALL finance data?\n\nThis removes ${txns.length} transaction${txns.length === 1 ? '' : 's'}, ${imports.length} import record${imports.length === 1 ? '' : 's'} ${vendors.length} vendor${vendors.length === 1 ? '' : 's'}, ${customers.length} customer${customers.length === 1 ? '' : 's'} and ${docs.length} invoice${docs.length === 1 ? '' : 's'} / PIs.\nLeads, tasks and notes are NOT affected.\n\nA safety backup of everything downloads first.`)) return;
             if (typeof backupLeadsJSON === 'function') backupLeadsJSON('HV_Backup_BeforeFinanceClear');
-            txns = []; imports = []; vendors = [];
-            save(); saveVendors();
+            txns = []; imports = []; vendors = []; customers = []; docs = [];
+            save(); saveVendors(); saveCustomers(); saveDocs();
             ui.view = 'all'; saveUI();
             renderImportHistory();
             hvRenderFinance();
@@ -6843,27 +7494,29 @@
         window.hvFinExportCSV = function () {
             const base = baseFiltered().filter(t => inView(t, ui.view)).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.seq || 0) - (b.seq || 0));
             if (!base.length) { alert('No transactions to export for the current filters.'); return; }
-            const head = ['Transaction Date', 'Ref No', 'Narration', 'Bank Account', 'Credit/Debit', 'Amount', 'Credit', 'Debit', 'Source / Nature of Expense', 'Party', 'Invoice No', 'Invoice Date', 'Invoice Amount', 'GST Amount', 'TDS Deducted', 'Vendor Bill No', 'Vendor', 'Vendor GSTIN', 'Vendor Payment Type', 'Vendor Invoice Date', 'Vendor Invoice Amount', 'GST in Vendor Invoice', 'TDS on Vendor Payment', 'Advance Adjusted', 'Comments', 'Month', 'FY Quarter', 'Financial Year'];
+            const head = ['Transaction Date', 'Ref No', 'Narration', 'Bank Account', 'Credit/Debit', 'Amount', 'Credit', 'Debit', 'Source / Nature of Expense', 'Party', 'Party GSTIN', 'Against', 'Invoice / PI No', 'Invoice / PI Date', 'Invoice / PI Total', 'GST in Invoice / PI', 'TDS on Invoice / PI', 'Client / Project', 'Bill No (other expenses)', 'Comments', 'Month', 'FY Quarter', 'Financial Year'];
             const cell = v => { v = v === null || v === undefined ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
             const lines = [head.join(',')].concat(base.map(t => [
                 t.date, t.refNo, t.narration, t.account, t.type, t.amount.toFixed(2),
                 t.type === 'Credit' ? t.amount.toFixed(2) : '', t.type === 'Debit' ? t.amount.toFixed(2) : '',
-                t.category, t.party, t.invoiceNo, t.invoiceDate, t.invoiceAmount == null ? '' : t.invoiceAmount, t.gstAmount == null ? '' : t.gstAmount, t.tdsAmount == null ? '' : t.tdsAmount,
-                t.billNo, ...(() => { const v = vendorById(t.vendorId); return [v ? v.name : '', v ? v.gstin : '']; })(),
-                t.payKind === 'advance' ? 'Advance' : t.payKind === 'invoice' ? 'Against invoice' : '', t.billDate || '',
-                t.billAmount == null ? '' : t.billAmount, t.billGst == null ? '' : t.billGst, t.billTds == null ? '' : t.billTds, t.advAdjusted == null ? '' : t.advAdjusted,
-                t.comments, t.date.slice(0, 7), fyQuarterOf(t.date), fyOf(t.date)
+                t.category, t.party, ...(() => { const v = partyOfTxn(t), d = v ? docById(t.docId) : null;
+                    return [v ? v.gstin : '', !v ? '' : t.payKind === 'advance' ? 'Advance' : d ? (d.kind === 'PI' ? 'PI' : 'Invoice') : 'Not linked',
+                        d ? d.no : '', d ? d.date : '', d ? csvAmt(d.total) : '', d ? csvAmt(d.gst) : '', d ? csvAmt(d.tds) : '', d ? d.client : '']; })(),
+                t.billNo, t.comments, t.date.slice(0, 7), fyQuarterOf(t.date), fyOf(t.date)
             ].map(cell).join(',')));
             hvDownload(`HV_Finance_${hvStamp()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
         };
 
         /* ---------- backup / restore hooks ---------- */
-        window.hvFinanceGetAll = function () { return { transactions: txns, imports: imports, vendors: vendors }; };
+        window.hvFinanceGetAll = function () { return { transactions: txns, imports: imports, vendors: vendors, customers: customers, docs: docs }; };
         window.hvFinanceReplaceAll = function (data) {
             txns = Array.isArray(data && data.transactions) ? data.transactions : [];
             imports = Array.isArray(data && data.imports) ? data.imports : [];
             save();
             if (Array.isArray(data && data.vendors)) { vendors = data.vendors; saveVendors(); }   /* older backups have no vendor list: keep the current one */
+            if (Array.isArray(data && data.customers)) { customers = data.customers; saveCustomers(); }
+            if (Array.isArray(data && data.docs)) { docs = data.docs; saveDocs(); }
+            migrated = false;
             hvRenderFinance();
         };
 
@@ -6874,8 +7527,10 @@
         document.addEventListener('keydown', e => {
             if (e.key !== 'Escape') return;
             if ($('finVendorModal').style.display === 'block') hvFinCloseVendorModal();
+            else if ($('finDocModal').style.display === 'block') hvFinCloseDoc();
             else if ($('finTxnModal').style.display === 'block') hvFinCloseTxnModal();
-            else if ($('finVendorsModal').style.display === 'block') hvFinCloseVendors();
+            else if ($('finPartiesModal').style.display === 'block') hvFinCloseParties();
+            else if ($('finDocsModal').style.display === 'block') hvFinCloseDocs();
             else if ($('finImportModal').style.display === 'block') hvFinCloseImport();
         });
         hvRenderFinance();

@@ -19,10 +19,10 @@ async function github(path, init = {}) {
 }
 
 export async function backupUser(uid, email) {
-  const [leads, tasks, notes, txns, imports, vendors] = await Promise.all(
-    ['crmLeads', 'crmTasks', 'crmNotes', 'hvFinanceTxns', 'hvFinanceImports', 'hvFinanceVendors'].map(k => readKey(uid, k)));
+  const [leads, tasks, notes, txns, imports, vendors, customers, docs] = await Promise.all(
+    ['crmLeads', 'crmTasks', 'crmNotes', 'hvFinanceTxns', 'hvFinanceImports', 'hvFinanceVendors', 'hvFinanceCustomers', 'hvFinanceDocs'].map(k => readKey(uid, k)));
   const L = leads || [], T = tasks || [], N = notes || [];
-  const F = { transactions: txns || [], imports: imports || [], vendors: vendors || [] };
+  const F = { transactions: txns || [], imports: imports || [], vendors: vendors || [], customers: customers || [], docs: docs || [] };
   const data = { app: 'Hypervision CRM', version: 1, exportedAt: new Date().toISOString(), source: 'nightly cloud backup',
     leadCount: L.length, leads: L, taskCount: T.length, tasks: T, noteCount: N.length, notes: N,
     financeTxnCount: F.transactions.length, finance: F };
